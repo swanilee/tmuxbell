@@ -4,15 +4,29 @@
 
 ![tmuxbell dashboard](docs/landing.png)
 
-A clean web dashboard for tmux sessions running on a single server (or
-docker container). Each session shows a live activity light so you can
-juggle many parallel Claude / shell sessions and instantly see which
-one is responding and which one just finished.
+I prefer to run many things in parallel — a Claude session, a training
+script, a test watcher, a build. With all of them open at once I'd
+often hop over to another session just to check what had finished,
+and the work I was actually focused on kept getting interrupted.
+
+**tmuxbell** is a small web dashboard that detects the moment a
+session goes quiet and shows it. While a session is producing output,
+its sidebar entry stays pink; the instant the output stops, it turns
+green. Any session you haven't looked at yet shows a ✓ next to it,
+so you can keep working in your current window and only step over
+when a check appears. **If this kind of friction sounds familiar,
+give it a try — work without losing your flow, comfortably and
+efficiently.**
+
+It works with anything that prints to a terminal — Claude Code,
+`python train.py`, `pytest --watch`, `cargo build`, and so on, all
+tracked the same way.
 
 - `tmuxbell` in one line launches both a new tmux session and the web dashboard
 - Sidebar lists every session; per-session color shows status (idle = green, working = pink)
-- Real `xterm.js` terminal → tmux pane splits / keybindings / Claude TUI all work
-- Backend pipes `tmux attach -t NAME` through `node-pty` over a WebSocket (no ttyd required)
+- ✓ check mark when a session finishes; clears automatically once you visit it
+- Real `xterm.js` terminal in the browser — tmux pane splits, keybindings, and Claude TUI all work
+- Backend pipes `tmux attach -t NAME` through `node-pty` over a WebSocket
 
 ## Requirements
 

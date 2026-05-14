@@ -2,14 +2,26 @@
 
 > 🌐 [English](README.md) · [한국어](README.ko.md) · **中文**
 
-一个用于单台服务器(或 docker 容器)上 tmux 会话的简洁网页面板。每个会话
-都有实时的活动状态指示,让你在并行运行多个 Claude / shell 会话时,
-能够一眼看出哪个正在响应、哪个刚刚完成。
+![tmuxbell dashboard](docs/landing.png)
+
+我习惯将多个任务并行运行 —— Claude 会话、训练脚本、测试 watcher、
+构建任务。把它们同时开着工作时,常常会忍不住切去看 "哪个跑完了",
+而正在专注的工作反而被打断。
+
+**tmuxbell** 是一个小型网页面板,会感知会话输出停下的那一刻并提示你。
+会话正在输出时,侧边栏条目显示为粉色;停止的瞬间转为绿色。尚未查看的
+会话上会出现 ✓ 标记,因此你可以专注于手头的工作,只在出现勾选时过去
+看一眼即可。**如果你也有类似的困扰,希望它能帮你保持工作节奏,
+从容、高效地推进事情。**
+
+它适用于任何向终端输出的任务 —— Claude Code、`python train.py`、
+`pytest --watch`、`cargo build` 等命令都以相同方式跟踪。
 
 - `tmuxbell` 一行命令同时启动新的 tmux 会话和网页面板
 - 侧边栏列出所有会话,颜色显示状态(等待 = 绿色,工作中 = 粉色)
-- 真正的 `xterm.js` 终端 → tmux 面板分割 / 快捷键 / Claude TUI 全部正常工作
-- 后端通过 `node-pty` 将 `tmux attach -t NAME` 经 WebSocket 转发(无需 ttyd)
+- ✓ 标记 —— 会话完成时出现,查看后自动清除
+- 真正的 `xterm.js` 浏览器终端 —— tmux 面板分割、快捷键、Claude TUI 全部正常工作
+- 后端通过 `node-pty` 将 `tmux attach -t NAME` 经 WebSocket 转发
 
 ## 系统要求
 
