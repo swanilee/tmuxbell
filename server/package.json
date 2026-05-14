@@ -1,5 +1,5 @@
 {
-  "name": "sgtmux-server",
+  "name": "tmuxbell-server",
   "version": "0.1.0",
   "description": "Web dashboard for tmux sessions, with per-session activity indicators",
   "private": true,

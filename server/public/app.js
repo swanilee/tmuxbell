@@ -1,4 +1,4 @@
-// sgtmux client.
+// tmuxbell client.
 //
 // Responsibilities:
 //   1) Poll /api/sessions every 1s → render sidebar with status dots.
@@ -395,7 +395,7 @@ function showEmptyState() {
     <div class="empty-state-card">
       <h2 class="empty-state-title">왼쪽에서 세션을 선택하거나 새로 만드세요</h2>
       <p class="empty-state-body">
-        터미널에서 <code>sgtmux</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.<br />
+        터미널에서 <code>tmuxbell</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.<br />
         세션 점이 <strong>녹색</strong>이면 응답 대기 중, <strong>분홍</strong>이면 작업 중입니다.
       </p>
     </div>`;
@@ -438,7 +438,7 @@ function openPanel(sessionName) {
     if (typeof ev.data === 'string') term.write(ev.data);
     else term.write(new Uint8Array(ev.data));
   };
-  ws.onclose = () => term.writeln('\r\n\x1b[2m[sgtmux] disconnected.\x1b[0m');
+  ws.onclose = () => term.writeln('\r\n\x1b[2m[tmuxbell] disconnected.\x1b[0m');
   term.onData((d) => { if (ws.readyState === 1) ws.send(d); });
 
   state.panel = { term, fitAddon, ws };

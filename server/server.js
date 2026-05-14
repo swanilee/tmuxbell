@@ -1,4 +1,4 @@
-// sgtmux dashboard server.
+// tmuxbell dashboard server.
 //
 // - GET  /api/sessions                            → list tmux sessions + activity
 // - POST /api/sessions/:name/new                  → create a new session
@@ -29,7 +29,7 @@ const { execSync, spawn } = require('child_process');
 const { WebSocketServer } = require('ws');
 const pty = require('node-pty');
 
-const PORT = parseInt(process.env.SGTMUX_PORT || '7681', 10);
+const PORT = parseInt(process.env.TMUXBELL_PORT || '7681', 10);
 const TMUX = 'tmux';
 const VIEW_PREFIX = '_sgview_';
 const IDLE_THRESHOLD_MS = 1500;
@@ -97,7 +97,7 @@ function ensureMonitor(name) {
       env: process.env,
     });
   } catch (e) {
-    console.error(`[sgtmux] failed to spawn monitor for ${name}:`, e.message);
+    console.error(`[tmuxbell] failed to spawn monitor for ${name}:`, e.message);
     return;
   }
   state.monitorPty = mon;
@@ -425,7 +425,7 @@ app.post('/api/sessions/:name/new', (req, res) => {
   if (!/^[A-Za-z0-9_-]+$/.test(name)) {
     return res.status(400).json({ ok: false, error: 'invalid session name' });
   }
-  const cmd = (req.body && req.body.cmd) || process.env.SGTMUX_DEFAULT_CMD || 'claude';
+  const cmd = (req.body && req.body.cmd) || process.env.TMUXBELL_DEFAULT_CMD || 'claude';
   try {
     execSync(`${TMUX} new-session -d -s ${JSON.stringify(name)} ${JSON.stringify(cmd)}`, { stdio: 'ignore' });
     trackSession(name);
@@ -465,7 +465,7 @@ app.post('/api/sessions/:name/windows', (req, res) => {
   const body = req.body || {};
   const fork = !!body.fork;
   const wname = (body.name && isValidName(body.name)) ? body.name : null;
-  const cmd = (typeof body.cmd === 'string' && body.cmd.trim()) ? body.cmd : (process.env.SGTMUX_DEFAULT_CMD || 'claude');
+  const cmd = (typeof body.cmd === 'string' && body.cmd.trim()) ? body.cmd : (process.env.TMUXBELL_DEFAULT_CMD || 'claude');
 
   const args = ['new-window', '-d', '-t', name, '-P', '-F', '#{window_index}'];
   if (wname) { args.push('-n', wname); }
@@ -645,6 +645,6 @@ wss.on('connection', (ws, req) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[sgtmux] listening on http://localhost:${PORT}`);
-  console.log(`[sgtmux] host=${os.hostname()}`);
+  console.log(`[tmuxbell] listening on http://localhost:${PORT}`);
+  console.log(`[tmuxbell] host=${os.hostname()}`);
 });

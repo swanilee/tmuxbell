@@ -1,6 +1,6 @@
 # Credits / Third-Party Notices
 
-`sgtmux`는 다음 오픈소스 프로젝트들의 훌륭한 작업 위에 만들어졌습니다.
+`tmuxbell`는 다음 오픈소스 프로젝트들의 훌륭한 작업 위에 만들어졌습니다.
 모든 라이선스는 permissive 계열(MIT / ISC / SIL OFL-1.1)이며 본 프로젝트의
 MIT 라이선스와 호환됩니다. 각 라이선스가 요구하는 원 저작권 표기를 아래에
 그대로 보존합니다.
@@ -66,7 +66,7 @@ SIL Open Font License 1.1. Copyright The JetBrains Mono Project Authors.
 | tmux | https://github.com/tmux/tmux | ISC |
 
 Used only as a child process (`tmux attach`, `tmux list-sessions`, etc.). Not
-redistributed as part of sgtmux.
+redistributed as part of tmuxbell.
 
 ## Design tokens
 

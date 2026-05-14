@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# tmuxbell: launch a tmux session and ensure the web dashboard is running.
+#
+# Usage:
+#   tmuxbell                       # auto-named session, attach
+#   tmuxbell NAME                  # named session, attach (create if missing)
+#   tmuxbell NAME -- CMD ARGS...   # named session running CMD instead of $TMUXBELL_DEFAULT_CMD
+#   tmuxbell --list                # just print sessions and the dashboard URL
+#
+# Env vars:
+#   TMUXBELL_DIR          (default: ~/tmuxbell)
+#   TMUXBELL_PORT         (default: 7681)
+#   TMUXBELL_DEFAULT_CMD  (default: "claude")
+
+set -euo pipefail
+
+TMUXBELL_DIR="${TMUXBELL_DIR:-$HOME/tmuxbell}"
+PORT="${TMUXBELL_PORT:-7681}"
+DEFAULT_CMD="${TMUXBELL_DEFAULT_CMD:-claude}"
+
+# Parse args
+LIST_ONLY=0
+SESSION=""
+CMD=""
+case "${1:-}" in
+  -h|--help)
+    cat <<EOF
+tmuxbell: tmux + web dashboard launcher
+
+Usage:
+  tmuxbell                       attach/create auto-named session, run \$TMUXBELL_DEFAULT_CMD (default: claude)
+  tmuxbell NAME                  attach/create session NAME, run \$TMUXBELL_DEFAULT_CMD
+  tmuxbell NAME -- CMD ARGS...   attach/create NAME, run "CMD ARGS..." instead
+  tmuxbell --list                print sessions + dashboard URL, do not attach
+  tmuxbell -h | --help           this message
+
+Env:
+  TMUXBELL_DIR          install root (default: ~/tmuxbell)
+  TMUXBELL_PORT         dashboard port (default: 7681)
+  TMUXBELL_DEFAULT_CMD  command for new sessions (default: claude)
+
+Web dashboard: http://localhost:\${TMUXBELL_PORT:-7681}
+EOF
+    exit 0
+    ;;
+  --list)
+    LIST_ONLY=1
+    ;;
+  "" )
+    ;;
+  *)
+    SESSION="$1"
+    shift || true
+    if [[ "${1:-}" == "--" ]]; then
+      shift
+      CMD="$*"
+    fi
+    ;;
+esac
+if [[ -z "$SESSION" && "$LIST_ONLY" -eq 0 ]]; then
+  SESSION="claude-$(date +%H%M%S)"
+fi
+[[ -z "$CMD" ]] && CMD="$DEFAULT_CMD"
+
+# Start dashboard if not already running
+start_dashboard() {
+  if pgrep -f "node $TMUXBELL_DIR/server/server.js" > /dev/null; then
+    return 0
+  fi
+  echo "[tmuxbell] starting dashboard at port $PORT..."
+  cd "$TMUXBELL_DIR/server"
+  TMUXBELL_PORT="$PORT" nohup node server.js > /tmp/tmuxbell-server.log 2>&1 &
+  # wait for port to be alive
+  for i in $(seq 1 20); do
+    if curl -sf "http://localhost:$PORT/api/sessions" > /dev/null; then return 0; fi
+    sleep 0.1
+  done
+  echo "[tmuxbell] WARNING: dashboard did not respond. Check /tmp/tmuxbell-server.log"
+}
+
+start_dashboard
+
+# Print URLs
+HOST="$(hostname)"
+echo "▶ Web:      http://localhost:$PORT  (host: $HOST)"
+if [[ "$LIST_ONLY" -eq 1 ]]; then
+  echo
+  echo "▶ Sessions:"
+  tmux ls 2>/dev/null || echo "  (none)"
+  exit 0
+fi
+echo "▶ Session:  $SESSION    (Ctrl-B D to detach, leaves session running)"
+echo "▶ Cmd:      $CMD"
+echo
+
+# Attach or create the tmux session
+exec tmux new-session -A -s "$SESSION" "$CMD"
