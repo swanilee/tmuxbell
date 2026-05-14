@@ -701,6 +701,37 @@ modalCreate.addEventListener('click', async () => {
 
 startWindowsPolling();
 
+// ── tmux global mouse mode toggle ───────────────────────────────────
+const mouseToggle = document.getElementById('mouseToggle');
+async function loadMouseState() {
+  try {
+    const r = await fetch('/api/mouse');
+    const j = await r.json();
+    if (mouseToggle) mouseToggle.checked = !!j.enabled;
+  } catch (_) {}
+}
+if (mouseToggle) {
+  mouseToggle.addEventListener('change', async () => {
+    const want = !!mouseToggle.checked;
+    try {
+      const r = await fetch('/api/mouse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: want }),
+      });
+      const j = await r.json();
+      if (!j.ok) {
+        mouseToggle.checked = !want;
+        alert(tmuxbellI18n.t('alert.request_failed', { error: j.error || 'unknown' }));
+      }
+    } catch (e) {
+      mouseToggle.checked = !want;
+      alert(tmuxbellI18n.t('alert.request_failed', { error: e.message }));
+    }
+  });
+}
+loadMouseState();
+
 // ── Sidebar collapse toggle ─────────────────────────────────────────
 const appEl = document.querySelector('.app');
 const sidebarToggle = document.getElementById('sidebarToggle');

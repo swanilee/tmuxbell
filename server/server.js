@@ -420,6 +420,28 @@ app.get('/api/sessions', (req, res) => {
   });
 });
 
+// ── tmux global mouse mode toggle ────────────────────────────────────
+// When 'mouse on' is set, wheel scroll in any pane automatically enters
+// tmux copy mode and scrolls back through the pane's history.
+app.get('/api/mouse', (req, res) => {
+  try {
+    const v = execSync(`${TMUX} show-options -gv mouse`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    res.json({ enabled: v === 'on' });
+  } catch (e) {
+    res.json({ enabled: false });
+  }
+});
+
+app.post('/api/mouse', (req, res) => {
+  const enabled = !!(req.body && req.body.enabled);
+  try {
+    execSync(`${TMUX} set -g mouse ${enabled ? 'on' : 'off'}`, { stdio: 'ignore' });
+    res.json({ ok: true, enabled });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.stderr ? e.stderr.toString() : String(e) });
+  }
+});
+
 app.post('/api/sessions/:name/new', (req, res) => {
   const name = req.params.name;
   if (!/^[A-Za-z0-9_-]+$/.test(name)) {
