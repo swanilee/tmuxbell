@@ -95,25 +95,16 @@ button {
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--s-xs);
+  gap: var(--s-sm);
   padding-bottom: var(--s-md);
   border-bottom: 1px solid var(--hairline);
 }
-.brand-mark {
-  width: 28px;
-  height: 28px;
-  background: var(--ink);
-  color: var(--inverse-ink);
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-sm);
-  font-weight: 540;
-  font-size: 14px;
-}
-.brand-name {
-  font-size: 20px;
-  font-weight: 540;
-  letter-spacing: -0.26px;
+.brand-logo {
+  height: 36px;
+  width: auto;
+  max-width: 160px;
+  object-fit: contain;
+  display: block;
 }
 .brand-host {
   margin-left: auto;
@@ -261,7 +252,19 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: text;
 }
+.session-name.editing,
+.window-row-name.editing {
+  background: var(--surface-recessed);
+  outline: 1px solid var(--accent-magenta);
+  border-radius: var(--r-xs);
+  padding: 0 4px;
+  white-space: normal;
+  overflow: visible;
+  cursor: text;
+}
+.window-row-name { cursor: text; }
 .session-meta {
   font-family: var(--font-sans);
   font-size: 11px;

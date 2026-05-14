@@ -489,6 +489,50 @@ app.post('/api/sessions/:name/windows/:idx/kill', (req, res) => {
   }
 });
 
+app.post('/api/sessions/:name/rename', (req, res) => {
+  const oldName = req.params.name;
+  const newName = req.body && req.body.to;
+  if (!isValidName(oldName)) return res.status(400).json({ ok: false, error: 'invalid current name' });
+  if (!isValidName(newName)) return res.status(400).json({ ok: false, error: 'invalid new name' });
+  if (oldName === newName) return res.json({ ok: true, name: newName });
+  if (sessionExists(newName)) return res.status(400).json({ ok: false, error: 'name already exists' });
+  try {
+    execSync(`${TMUX} rename-session -t ${JSON.stringify(oldName)} ${JSON.stringify(newName)}`, { stdio: 'ignore' });
+    // migrate our session state map
+    const st = sessions.get(oldName);
+    if (st) {
+      sessions.delete(oldName);
+      sessions.set(newName, st);
+    }
+    // migrate per-window states
+    const prefix = `${oldName}::`;
+    for (const k of Array.from(windowStates.keys())) {
+      if (k.startsWith(prefix)) {
+        const suffix = k.substring(prefix.length);
+        windowStates.set(`${newName}::${suffix}`, windowStates.get(k));
+        windowStates.delete(k);
+      }
+    }
+    res.json({ ok: true, name: newName });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.stderr ? e.stderr.toString() : String(e) });
+  }
+});
+
+app.post('/api/sessions/:name/windows/:idx/rename', (req, res) => {
+  const name = req.params.name;
+  const idx = parseInt(req.params.idx, 10);
+  const newName = req.body && req.body.to;
+  if (!isValidName(name) || isNaN(idx)) return res.status(400).json({ ok: false, error: 'invalid params' });
+  if (!isValidName(newName)) return res.status(400).json({ ok: false, error: 'invalid new name' });
+  try {
+    execSync(`${TMUX} rename-window -t ${JSON.stringify(name + ':' + idx)} ${JSON.stringify(newName)}`, { stdio: 'ignore' });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.stderr ? e.stderr.toString() : String(e) });
+  }
+});
+
 app.post('/api/sessions/:name/windows/:idx/select', (req, res) => {
   const name = req.params.name;
   const idx = parseInt(req.params.idx, 10);

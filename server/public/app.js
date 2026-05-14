@@ -125,6 +125,12 @@ function createSessionItem(s) {
   const name = document.createElement('div');
   name.className = 'session-name';
   name.textContent = s.name;
+  name.title = '더블클릭해서 이름 변경';
+  name.addEventListener('dblclick', (ev) => {
+    ev.stopPropagation();
+    const current = s.name;
+    makeEditable(name, current, (v) => renameSession(current, v));
+  });
   header.appendChild(name);
 
   const count = document.createElement('span');
@@ -231,6 +237,13 @@ function updateWindowSublist(ul, sessionName, windows) {
       const nameEl = document.createElement('span');
       nameEl.className = 'window-row-name';
       nameEl.textContent = w.name || `window-${w.index}`;
+      nameEl.title = '더블클릭해서 이름 변경';
+      const wIdx = w.index;
+      nameEl.addEventListener('dblclick', (ev) => {
+        ev.stopPropagation();
+        const cur = nameEl.textContent || '';
+        makeEditable(nameEl, cur, (v) => renameWindow(sessionName, wIdx, v));
+      });
       const iconEl = document.createElement('span');
       iconEl.className = 'window-row-icon';
       iconEl.dataset.type = '';
@@ -251,7 +264,9 @@ function updateWindowSublist(ul, sessionName, windows) {
       existing.delete(w.index);
       const nameEl = el.querySelector('.window-row-name');
       const wantName = w.name || `window-${w.index}`;
-      if (nameEl && nameEl.textContent !== wantName) nameEl.textContent = wantName;
+      if (nameEl && !nameEl.classList.contains('editing') && nameEl.textContent !== wantName) {
+        nameEl.textContent = wantName;
+      }
     }
 
     // status classes
@@ -277,6 +292,75 @@ function updateWindowSublist(ul, sessionName, windows) {
     if (want && ul.children[i] !== want) {
       ul.insertBefore(want, ul.children[i] || null);
     }
+  }
+}
+
+// ── Inline rename helpers ──────────────────────────────────────────
+function makeEditable(el, originalValue, onCommit) {
+  el.setAttribute('contenteditable', 'plaintext-only');
+  el.classList.add('editing');
+  el.textContent = originalValue;
+  // place caret at end + select all
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  el.focus();
+
+  let committed = false;
+  const finish = (commit) => {
+    if (committed) return;
+    committed = true;
+    el.removeAttribute('contenteditable');
+    el.classList.remove('editing');
+    const newVal = el.textContent.trim();
+    if (commit && newVal && newVal !== originalValue) {
+      onCommit(newVal);
+    } else {
+      el.textContent = originalValue;
+    }
+  };
+  const onKey = (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); finish(true); el.removeEventListener('keydown', onKey); el.removeEventListener('blur', onBlur); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); el.removeEventListener('keydown', onKey); el.removeEventListener('blur', onBlur); }
+  };
+  const onBlur = () => { finish(true); el.removeEventListener('keydown', onKey); el.removeEventListener('blur', onBlur); };
+  el.addEventListener('keydown', onKey);
+  el.addEventListener('blur', onBlur);
+}
+
+async function renameSession(oldName, newName) {
+  if (!/^[A-Za-z0-9_-]+$/.test(newName)) { alert('이름은 영숫자/하이픈/언더스코어만.'); return; }
+  try {
+    const r = await fetch(`/api/sessions/${encodeURIComponent(oldName)}/rename`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: newName }),
+    });
+    const j = await r.json();
+    if (!j.ok) { alert('이름 변경 실패: ' + (j.error || 'unknown')); return; }
+    if (state.current === oldName) state.current = newName;
+    await fetchSessions();
+  } catch (e) {
+    alert('요청 실패: ' + e.message);
+  }
+}
+
+async function renameWindow(sessionName, idx, newName) {
+  if (!/^[A-Za-z0-9_-]+$/.test(newName)) { alert('이름은 영숫자/하이픈/언더스코어만.'); return; }
+  try {
+    const r = await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/windows/${idx}/rename`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: newName }),
+    });
+    const j = await r.json();
+    if (!j.ok) { alert('이름 변경 실패: ' + (j.error || 'unknown')); return; }
+    await fetchSessions();
+    if (state.current === sessionName) refreshWindows();
+  } catch (e) {
+    alert('요청 실패: ' + e.message);
   }
 }
 
