@@ -1,9 +1,9 @@
 # Credits / Third-Party Notices
 
-`sgtmux` builds on the following open-source software. All listed licenses are
-permissive (MIT / ISC / SIL OFL-1.1) and compatible with this project's MIT
-license. The original copyright notices are retained below as required by
-their respective licenses.
+`sgtmux`는 다음 오픈소스 프로젝트들의 훌륭한 작업 위에 만들어졌습니다.
+모든 라이선스는 permissive 계열(MIT / ISC / SIL OFL-1.1)이며 본 프로젝트의
+MIT 라이선스와 호환됩니다. 각 라이선스가 요구하는 원 저작권 표기를 아래에
+그대로 보존합니다.
 
 ## Runtime dependencies (Node, npm-installed)
 

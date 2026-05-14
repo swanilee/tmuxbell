@@ -58,7 +58,9 @@ SGTMUX_PORT=7681 node server.js
 # 브라우저 http://localhost:7681
 ```
 
-## Built with
+## Built on
+
+sgtmux는 다음 오픈소스 프로젝트들의 훌륭한 작업 위에 만들어졌습니다.
 
 - [tmux](https://github.com/tmux/tmux) — terminal multiplexing
 - [xterm.js](https://github.com/xtermjs/xterm.js) — browser terminal
@@ -67,7 +69,7 @@ SGTMUX_PORT=7681 node server.js
 - [Pretendard](https://github.com/orioncactus/pretendard), [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) — typography
 - [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md) — design tokens
 
-전체 라이선스는 [`CREDITS.md`](./CREDITS.md).
+전체 라이선스·저작권 표기는 [`CREDITS.md`](./CREDITS.md).
 
 ## 라이선스
 
