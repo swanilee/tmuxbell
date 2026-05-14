@@ -199,7 +199,7 @@ button {
   font-size: 12px;
   color: var(--ink);
   opacity: 0.6;
-  transition: background 0.1s, opacity 0.1s;
+  transition: background 0.1s, opacity 0.1s, color 0.1s;
 }
 .window-row:hover { background: var(--surface-soft); opacity: 1; }
 .window-row.active {
@@ -207,6 +207,11 @@ button {
   opacity: 1;
   font-weight: 500;
 }
+.window-row.window-busy {
+  color: var(--accent-magenta);
+  opacity: 1;
+}
+.window-row.window-busy .window-row-idx { color: var(--accent-magenta); opacity: 1; }
 .window-row-idx {
   font-family: var(--font-sans);
   font-size: 10px;
@@ -219,6 +224,17 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+}
+.window-row-icon {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--semantic-success);
 }
 .session-dot {
   width: 10px;

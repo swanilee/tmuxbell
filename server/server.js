@@ -126,6 +126,79 @@ function cleanupMonitors(currentNames) {
   }
 }
 
+// ── Per-window activity tracking via capture-pane polling ────────────────
+//
+// Background interval captures each window's visible pane and hashes it.
+// When the hash changes, that window's lastChangeMs advances. Echo from the
+// active window is suppressed if user typed recently.
+const windowStates = new Map();      // key: 'session::idx' → state object
+const WINDOW_POLL_MS = 700;
+
+function getWindowKey(session, idx) { return `${session}::${idx}`; }
+
+function trackWindow(session, idx) {
+  const k = getWindowKey(session, idx);
+  if (!windowStates.has(k)) {
+    windowStates.set(k, {
+      hash: null,
+      lastChangeMs: 0,
+      prevStatus: 'unknown',
+      completedAt: 0,
+      acknowledgedAt: 0,
+    });
+  }
+  return windowStates.get(k);
+}
+
+function hashString(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+function pollWindowOnce(session, idx, isActiveWindow) {
+  let content;
+  try {
+    content = execSync(
+      `${TMUX} capture-pane -p -t ${JSON.stringify(`${session}:${idx}`)}`,
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    );
+  } catch (_) {
+    return;
+  }
+  const h = hashString(content);
+  const state = trackWindow(session, idx);
+  const now = Date.now();
+  if (state.hash !== null && state.hash !== h) {
+    const sessionState = sessions.get(session);
+    const sinceUserInput = sessionState
+      ? now - sessionState.lastUserInputMs
+      : Number.POSITIVE_INFINITY;
+    const isEcho = isActiveWindow && sinceUserInput < ECHO_SUPPRESS_MS;
+    if (!isEcho) state.lastChangeMs = now;
+  }
+  state.hash = h;
+}
+
+function cleanupWindowStates(currentKeys) {
+  for (const k of Array.from(windowStates.keys())) {
+    if (!currentKeys.has(k)) windowStates.delete(k);
+  }
+}
+
+setInterval(() => {
+  const allWindows = listAllWindows();
+  const seen = new Set();
+  for (const [session, wins] of allWindows.entries()) {
+    if (session.startsWith(VIEW_PREFIX)) continue;
+    for (const w of wins) {
+      seen.add(getWindowKey(session, w.index));
+      pollWindowOnce(session, w.index, !!w.active);
+    }
+  }
+  cleanupWindowStates(seen);
+}, WINDOW_POLL_MS);
+
 function sessionExists(name) {
   try {
     execSync(`${TMUX} has-session -t ${JSON.stringify(name)}`, { stdio: 'ignore' });
@@ -246,6 +319,28 @@ function tmuxList() {
     if (state) state.prevStatus = status;
     const hasUnseenCompletion =
       state && state.completedAt > state.acknowledgedAt;
+    // Enrich window list with per-window status + completion
+    const sessionIsViewed = state && state.ptys.size > 0;
+    const windowList = (allWindows.get(name) || []).map(w => {
+      const ws = trackWindow(name, w.index);
+      const wIdleMs = ws.lastChangeMs ? now - ws.lastChangeMs : null;
+      let wStatus = 'unknown';
+      if (ws.lastChangeMs > 0) {
+        wStatus = wIdleMs > IDLE_THRESHOLD_MS ? 'idle' : 'active';
+      }
+      if (ws.prevStatus === 'active' && wStatus === 'idle') {
+        ws.completedAt = now;
+        // Auto-ack if user is actually looking at this window right now
+        if (sessionIsViewed && w.active) ws.acknowledgedAt = now;
+      }
+      ws.prevStatus = wStatus;
+      const wHasUnseen = ws.completedAt > ws.acknowledgedAt;
+      return {
+        ...w,
+        status: wStatus,
+        hasUnseenCompletion: !!wHasUnseen,
+      };
+    });
     return {
       name,
       created: parseInt(created, 10) * 1000,
@@ -255,7 +350,7 @@ function tmuxList() {
       idleMs,
       status,
       hasUnseenCompletion: !!hasUnseenCompletion,
-      windows: allWindows.get(name) || [],
+      windows: windowList,
     };
   });
   cleanupMonitors(names);
@@ -364,6 +459,13 @@ app.post('/api/sessions/:name/windows/:idx/select', (req, res) => {
   if (!isValidName(name) || isNaN(idx)) return res.status(400).json({ ok: false, error: 'invalid params' });
   try {
     execSync(`${TMUX} select-window -t ${JSON.stringify(name + ':' + idx)}`, { stdio: 'ignore' });
+    // Session monitor pty will get a redraw burst when tmux switches windows
+    // for attached clients. Absorb it so we don't false-positive "active".
+    const state = sessions.get(name);
+    if (state) startBurst(state);
+    // The user is viewing this window now → ack any unseen completion on it
+    const ws = trackWindow(name, idx);
+    ws.acknowledgedAt = Date.now();
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.stderr ? e.stderr.toString() : String(e) });

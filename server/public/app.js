@@ -231,13 +231,16 @@ function updateWindowSublist(ul, sessionName, windows) {
       const nameEl = document.createElement('span');
       nameEl.className = 'window-row-name';
       nameEl.textContent = w.name || `window-${w.index}`;
+      const iconEl = document.createElement('span');
+      iconEl.className = 'window-row-icon';
+      iconEl.dataset.type = '';
       el.appendChild(idxEl);
       el.appendChild(nameEl);
+      el.appendChild(iconEl);
       el.addEventListener('click', (ev) => {
         ev.stopPropagation();
         if (state.current !== sessionName) {
           selectSession(sessionName);
-          // selectSession opens panel; queue window switch after a tick
           setTimeout(() => selectWindow(w.index), 50);
         } else {
           selectWindow(w.index);
@@ -250,13 +253,25 @@ function updateWindowSublist(ul, sessionName, windows) {
       const wantName = w.name || `window-${w.index}`;
       if (nameEl && nameEl.textContent !== wantName) nameEl.textContent = wantName;
     }
-    const wantActive = !!w.active && state.current === sessionName;
-    if (el.classList.contains('active') !== wantActive) {
-      el.classList.toggle('active', wantActive);
+
+    // status classes
+    const wantActiveTab = !!w.active && state.current === sessionName;
+    el.classList.toggle('active', wantActiveTab);
+    el.classList.toggle('window-busy', w.status === 'active');
+
+    // status icon slot (spinner not used here — text color is the cue)
+    const iconEl = el.querySelector('.window-row-icon');
+    let wantType = 'none';
+    if (w.hasUnseenCompletion && w.status !== 'active') wantType = 'check';
+    if (iconEl && iconEl.dataset.type !== wantType) {
+      iconEl.dataset.type = wantType;
+      iconEl.innerHTML = '';
+      if (wantType === 'check') {
+        iconEl.textContent = '✓';
+      }
     }
   }
   for (const el of existing.values()) el.remove();
-  // re-order to match windows[]
   for (let i = 0; i < windows.length; i++) {
     const want = ul.querySelector(`[data-idx="${windows[i].index}"]`);
     if (want && ul.children[i] !== want) {
@@ -303,7 +318,8 @@ function showEmptyState() {
     <div class="empty-state-card">
       <h2 class="empty-state-title">왼쪽에서 세션을 선택하거나 새로 만드세요</h2>
       <p class="empty-state-body">
-        터미널에서 <code>sgtmux</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.
+        터미널에서 <code>sgtmux</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.<br />
+        세션 점이 <strong>녹색</strong>이면 응답 대기 중, <strong>분홍</strong>이면 작업 중입니다.
       </p>
     </div>`;
 }
