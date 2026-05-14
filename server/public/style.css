@@ -380,33 +380,86 @@ button {
 }
 .btn-tertiary:hover { background: var(--surface-soft); }
 
-/* ---------- Mouse wheel scrollback toggle ---------- */
-.mouse-toggle {
+/* ---------- Sidebar footer (settings + language) ---------- */
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+  padding-top: var(--s-sm);
+  border-top: 1px solid var(--hairline-soft);
+}
+
+.settings-row {
   display: flex;
   align-items: center;
-  gap: var(--s-xs);
+  justify-content: space-between;
+  gap: var(--s-sm);
   padding: 6px 8px;
-  font-size: 12px;
-  color: var(--ink);
-  opacity: 0.75;
-  cursor: pointer;
-  user-select: none;
   border-radius: var(--r-md);
-  transition: opacity 0.1s, background 0.1s;
-}
-.mouse-toggle:hover { opacity: 1; background: var(--surface-soft); }
-.mouse-toggle input {
-  accent-color: var(--accent-magenta);
+  font-family: var(--font-sans);
+  transition: background 0.1s;
   cursor: pointer;
-  margin: 0;
+}
+.settings-row:hover { background: var(--surface-soft); }
+.settings-label {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink);
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* iOS-style toggle switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--hairline-mid);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  top: 3px;
+  background: var(--ink);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--accent-magenta);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(14px);
+  background: #fff;
+}
+.toggle-switch input:focus-visible + .toggle-slider {
+  box-shadow: 0 0 0 2px rgba(255, 61, 139, 0.35);
 }
 
 /* ---------- Language switcher (sidebar bottom) ---------- */
 .lang-switcher {
   display: flex;
   gap: 4px;
-  padding-top: var(--s-sm);
-  border-top: 1px solid var(--hairline-soft);
 }
 .lang-btn {
   flex: 1;

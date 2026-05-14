@@ -23,14 +23,19 @@
       <div class="eyebrow" data-i18n="sidebar.sessions">SESSIONS</div>
       <ul class="session-list" id="sessionList"></ul>
       <button class="btn-primary" id="newSessionBtn" data-i18n="sidebar.new">+ New session</button>
-      <label class="mouse-toggle">
-        <input type="checkbox" id="mouseToggle" />
-        <span data-i18n="sidebar.mouse_wheel">Mouse-wheel scrollback</span>
-      </label>
-      <div class="lang-switcher" id="langSwitcher">
-        <button class="lang-btn" type="button" data-lang="en">EN</button>
-        <button class="lang-btn" type="button" data-lang="ko">한</button>
-        <button class="lang-btn" type="button" data-lang="zh">中</button>
+      <div class="sidebar-footer">
+        <label class="settings-row" for="mouseToggle">
+          <span class="settings-label" data-i18n="sidebar.mouse_wheel">Mouse-wheel scrollback</span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="mouseToggle" />
+            <span class="toggle-slider" aria-hidden="true"></span>
+          </span>
+        </label>
+        <div class="lang-switcher" id="langSwitcher">
+          <button class="lang-btn" type="button" data-lang="en">EN</button>
+          <button class="lang-btn" type="button" data-lang="ko">한</button>
+          <button class="lang-btn" type="button" data-lang="zh">中</button>
+        </div>
       </div>
     </aside>
     <main class="main">
