@@ -582,22 +582,64 @@ window.addEventListener('resize', () => {
   } catch (_) {}
 });
 
-newBtn.addEventListener('click', async () => {
+// ── New-session modal ──────────────────────────────────────────────
+const newSessionModal = document.getElementById('newSessionModal');
+const newSessionNameEl = document.getElementById('newSessionName');
+const newSessionCwdEl = document.getElementById('newSessionCwd');
+const newSessionCreate = document.getElementById('newSessionCreate');
+
+function openNewSessionModal() {
   const stamp = new Date().toISOString().slice(11, 19).replace(/:/g, '');
-  const name = prompt(tmuxbellI18n.t('prompt.new_session_name'), `claude-${stamp}`);
+  newSessionNameEl.value = `claude-${stamp}`;
+  newSessionCwdEl.value = '';
+  newSessionModal.hidden = false;
+  setTimeout(() => { newSessionNameEl.focus(); newSessionNameEl.select(); }, 0);
+}
+function closeNewSessionModal() { newSessionModal.hidden = true; }
+
+newBtn.addEventListener('click', openNewSessionModal);
+
+newSessionModal.addEventListener('click', (ev) => {
+  if (ev.target.dataset.modalClose !== undefined || ev.target === newSessionModal.querySelector('.modal-backdrop')) {
+    closeNewSessionModal();
+  }
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && !newSessionModal.hidden) closeNewSessionModal();
+});
+
+newSessionCreate.addEventListener('click', async () => {
+  const name = (newSessionNameEl.value || '').trim();
+  const cwd = (newSessionCwdEl.value || '').trim() || undefined;
   if (!name) return;
   if (!/^[A-Za-z0-9_-]+$/.test(name)) {
     alert(tmuxbellI18n.t('alert.invalid_name'));
     return;
   }
+  newSessionCreate.disabled = true;
   try {
-    const r = await fetch(`/api/sessions/${encodeURIComponent(name)}/new`, { method: 'POST' });
+    const r = await fetch(`/api/sessions/${encodeURIComponent(name)}/new`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd }),
+    });
     const j = await r.json();
     if (!j.ok) { alert(tmuxbellI18n.t('alert.create_failed', {error: j.error || 'unknown'})); return; }
+    closeNewSessionModal();
     await fetchSessions();
     selectSession(name);
   } catch (e) {
     alert(tmuxbellI18n.t('alert.request_failed', {error: e.message}));
+  } finally {
+    newSessionCreate.disabled = false;
+  }
+});
+
+// Enter key in the modal also submits
+newSessionModal.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter' && !newSessionCreate.disabled) {
+    ev.preventDefault();
+    newSessionCreate.click();
   }
 });
 

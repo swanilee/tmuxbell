@@ -425,9 +425,17 @@ app.post('/api/sessions/:name/new', (req, res) => {
   if (!/^[A-Za-z0-9_-]+$/.test(name)) {
     return res.status(400).json({ ok: false, error: 'invalid session name' });
   }
-  const cmd = (req.body && req.body.cmd) || process.env.TMUXBELL_DEFAULT_CMD || 'claude';
+  const body = req.body || {};
+  const cmd = body.cmd || process.env.TMUXBELL_DEFAULT_CMD || 'claude';
+  const cwd = typeof body.cwd === 'string' && body.cwd.trim() ? body.cwd.trim() : null;
+  if (cwd && !fs.existsSync(cwd)) {
+    return res.status(400).json({ ok: false, error: `cwd does not exist: ${cwd}` });
+  }
+  const args = ['new-session', '-d', '-s', name];
+  if (cwd) { args.push('-c', cwd); }
+  args.push(cmd);
   try {
-    execSync(`${TMUX} new-session -d -s ${JSON.stringify(name)} ${JSON.stringify(cmd)}`, { stdio: 'ignore' });
+    execSync(`${TMUX} ${args.map(a => JSON.stringify(a)).join(' ')}`, { stdio: 'ignore' });
     trackSession(name);
     res.json({ ok: true, name });
   } catch (e) {

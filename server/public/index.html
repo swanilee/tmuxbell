@@ -51,6 +51,27 @@
     </main>
   </div>
 
+  <!-- New session modal -->
+  <div id="newSessionModal" class="modal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card">
+      <div class="eyebrow" data-i18n="new_session.title">New session</div>
+      <label class="field">
+        <span class="field-label" data-i18n="new_session.name_label">Session name</span>
+        <input type="text" id="newSessionName" data-i18n-placeholder="new_session.name_placeholder" class="text-input" />
+      </label>
+      <label class="field">
+        <span class="field-label" data-i18n="new_session.cwd_label">Working directory (optional)</span>
+        <input type="text" id="newSessionCwd" data-i18n-placeholder="new_session.cwd_placeholder" class="text-input" />
+        <span class="field-help" data-i18n="new_session.cwd_help">Leave blank to use the server's home directory. Must be an absolute path that exists.</span>
+      </label>
+      <div class="modal-actions">
+        <button class="btn-tertiary" data-modal-close data-i18n="modal.cancel">Cancel</button>
+        <button class="btn-primary" id="newSessionCreate" data-i18n="modal.create">Create</button>
+      </div>
+    </div>
+  </div>
+
   <!-- New window modal -->
   <div id="newWindowModal" class="modal" hidden>
     <div class="modal-backdrop" data-modal-close></div>
