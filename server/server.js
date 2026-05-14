@@ -22,10 +22,14 @@ const pty = require('node-pty');
 const PORT = parseInt(process.env.SGTMUX_PORT || '7681', 10);
 const TMUX = 'tmux';
 const IDLE_THRESHOLD_MS = 1500;
-// New WS attach causes tmux to dump a full-screen redraw. Suppress activity
-// detection for this window so switching sessions doesn't false-positive
-// "Claude is responding."
-const ATTACH_GRACE_MS = 500;
+// When a new WS attaches, tmux dumps a full-screen redraw. We mark the
+// session "in burst" and only treat output as genuine activity once the
+// burst ends. A burst ends when either:
+//   - 500ms passes without any output (tmux is done repainting), OR
+//   - 3 seconds have elapsed total (safety cap so real streaming can't be
+//     masked indefinitely).
+const BURST_QUIET_MS = 500;
+const BURST_MAX_MS = 3000;
 
 const sessions = new Map();
 function trackSession(name) {
@@ -34,10 +38,25 @@ function trackSession(name) {
       lastOutputMs: 0,
       ptys: new Set(),
       bellAt: 0,
-      attachGraceUntil: 0,
+      burstActive: false,
+      burstQuietTimer: null,
+      burstMaxTimer: null,
     });
   }
   return sessions.get(name);
+}
+
+function endBurst(state) {
+  state.burstActive = false;
+  if (state.burstQuietTimer) { clearTimeout(state.burstQuietTimer); state.burstQuietTimer = null; }
+  if (state.burstMaxTimer) { clearTimeout(state.burstMaxTimer); state.burstMaxTimer = null; }
+}
+
+function startBurst(state) {
+  endBurst(state);
+  state.burstActive = true;
+  state.burstQuietTimer = setTimeout(() => endBurst(state), BURST_QUIET_MS);
+  state.burstMaxTimer = setTimeout(() => endBurst(state), BURST_MAX_MS);
 }
 
 function tmuxList() {
@@ -138,14 +157,20 @@ wss.on('connection', (ws, req) => {
 
   const state = trackSession(name);
   state.ptys.add(term);
-  // Start an attach-grace window. Output during this window is *displayed*
-  // but does not count as "Claude is producing output" — it's just tmux
-  // repainting the screen for the new client.
-  state.attachGraceUntil = Date.now() + ATTACH_GRACE_MS;
+  // Output that arrives between WS attach and the redraw burst settling is
+  // "tmux repainting for the new client", not genuine activity. Burst is
+  // active until 500ms of quiet OR 3s safety cap.
+  startBurst(state);
 
   term.onData(data => {
     const now = Date.now();
-    if (now >= state.attachGraceUntil) state.lastOutputMs = now;
+    if (state.burstActive) {
+      // still in redraw burst — extend the quiet timer, don't count as activity
+      if (state.burstQuietTimer) clearTimeout(state.burstQuietTimer);
+      state.burstQuietTimer = setTimeout(() => endBurst(state), BURST_QUIET_MS);
+    } else {
+      state.lastOutputMs = now;
+    }
     if (data.includes('\x07')) state.bellAt = now;
     try { ws.send(data); } catch (_) {}
   });
