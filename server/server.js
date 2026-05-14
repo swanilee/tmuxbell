@@ -63,10 +63,18 @@ function trackSession(name) {
       prevStatus: 'unknown',
       completedAt: 0,        // last active → idle transition
       acknowledgedAt: 0,     // last WS connect or explicit ack
+      // Claude Code hook signals (precise busy/idle, supersedes output-based)
+      claudeBusy: false,
+      claudeLastEventMs: 0,
     });
   }
   return sessions.get(name);
 }
+
+// If a Claude Code hook hasn't refreshed the busy state in this long, fall
+// back to output-based detection (in case the user killed claude without it
+// firing the Stop hook).
+const CLAUDE_HOOK_TIMEOUT_MS = 10 * 60 * 1000;
 
 function endBurst(state, reason) {
   state.burstActive = false;
@@ -345,8 +353,13 @@ function tmuxList() {
     const lastOutputMs = state ? state.lastOutputMs : 0;
     const prevOutputMs = state ? state.prevOutputMs : 0;
     const idleMs = lastOutputMs ? now - lastOutputMs : null;
+    // Claude hook overrides output-based detection while fresh
+    const claudeFresh = state && state.claudeBusy &&
+      (now - state.claudeLastEventMs) < CLAUDE_HOOK_TIMEOUT_MS;
     let status = 'unknown';
-    if (lastOutputMs > 0) {
+    if (claudeFresh) {
+      status = 'active';
+    } else if (lastOutputMs > 0) {
       if (idleMs > IDLE_THRESHOLD_MS) {
         status = 'idle';
       } else if (lastOutputMs - prevOutputMs > SUSTAINED_GAP_MS) {
@@ -449,6 +462,33 @@ app.post('/api/mouse', (req, res) => {
   } catch (e) {
     res.status(400).json({ ok: false, error: e.stderr ? e.stderr.toString() : String(e) });
   }
+});
+
+// ── Claude Code hook ingress ─────────────────────────────────────────
+// Called by ~/.claude/settings.json hooks (see bin/tmuxbell-hooks.js):
+//   - /claude/start  : claude began processing a prompt or tool
+//   - /claude/stop   : claude finished its response
+// The frontend sees these as instant authoritative state transitions
+// (preferred over output-based heuristics).
+app.post('/api/sessions/:name/claude/:event', (req, res) => {
+  const name = req.params.name;
+  const event = req.params.event;
+  if (!isValidName(name)) return res.status(400).json({ ok: false, error: 'invalid session name' });
+  if (event !== 'start' && event !== 'stop') {
+    return res.status(400).json({ ok: false, error: 'invalid event' });
+  }
+  const state = trackSession(name);
+  const now = Date.now();
+  state.claudeLastEventMs = now;
+  if (event === 'start') {
+    state.claudeBusy = true;
+  } else {
+    state.claudeBusy = false;
+    // Treat as 'completion' — pops the ✓ check if user isn't viewing
+    state.completedAt = now;
+    if (state.ptys.size > 0) state.acknowledgedAt = now;
+  }
+  res.json({ ok: true });
 });
 
 app.post('/api/sessions/:name/new', (req, res) => {

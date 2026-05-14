@@ -91,6 +91,29 @@ for a one-off override.
 - **Language switcher** ([EN] / [한] / [中]) at the very bottom of the
   sidebar; the choice is remembered per browser.
 
+## Tighter detection via Claude Code hooks (optional)
+
+The output-based detector can miss "silent busy" moments — e.g. when
+Claude is running a long `Bash` tool call like `sleep 30` that prints
+nothing. If you want airtight busy/idle detection, install two tiny
+hooks into `~/.claude/settings.json`:
+
+```bash
+tmuxbell --install-hooks    # adds UserPromptSubmit + Stop hooks
+tmuxbell --uninstall-hooks  # removes them
+```
+
+The hooks just curl the dashboard with the current tmux session name:
+
+- `UserPromptSubmit` → `/claude/start` (Claude is processing)
+- `Stop` → `/claude/stop` (Claude is done — ✓ pops next to the session)
+
+While these hook signals are fresh, they take priority over the
+output heuristic, so the sidebar stays magenta for the whole duration
+of a tool call even if no bytes hit the terminal. Existing hooks in
+your config are left untouched; only the two tmuxbell entries are
+added (each tagged `# tmuxbell-hook-PORT` for easy removal).
+
 ## Environment variables
 
 | Name | Default | Description |

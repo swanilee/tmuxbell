@@ -79,6 +79,27 @@ tmuxbell --list       # 列出会话 + 输出面板 URL
   会自动进入 tmux 复制模式并回溯历史输出。默认关闭。
 - **语言切换器**([EN] / [한] / [中])位于侧边栏最下方,浏览器会记住选择。
 
+## 通过 Claude Code 钩子提高精度(可选)
+
+基于输出的检测会漏掉 "静默工作" 的瞬间 —— 例如 Claude 通过 `Bash`
+工具执行 `sleep 30`,这段时间不会向终端输出任何内容,会被判为 idle。
+若需要精确的 busy/idle 信号,可向 `~/.claude/settings.json` 添加
+两个简短的钩子:
+
+```bash
+tmuxbell --install-hooks    # 添加 UserPromptSubmit + Stop 钩子
+tmuxbell --uninstall-hooks  # 再次移除
+```
+
+这两个钩子只是用当前 tmux 会话名向面板发起一次 curl:
+
+- `UserPromptSubmit` → `/claude/start`(Claude 开始处理)
+- `Stop` → `/claude/stop`(Claude 完成响应 —— 会话旁出现 ✓)
+
+钩子信号有效时优先级高于输出启发式,因此即便没有任何字节到达终端,
+工具调用持续期间侧边栏会一直保持品红色。已有的钩子设置不会被修改,
+tmuxbell 添加的条目都带有 `# tmuxbell-hook-端口` 标记,卸载时只移除这些。
+
 ## 环境变量
 
 | 名称 | 默认值 | 说明 |

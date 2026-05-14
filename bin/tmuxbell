@@ -32,6 +32,9 @@ Usage:
   tmuxbell NAME                  attach/create session NAME, run \$TMUXBELL_DEFAULT_CMD
   tmuxbell NAME -- CMD ARGS...   attach/create NAME, run "CMD ARGS..." instead
   tmuxbell --list                print sessions + dashboard URL, do not attach
+  tmuxbell --install-hooks       add UserPromptSubmit + Stop hooks to ~/.claude/settings.json
+                                 for precise claude busy/idle detection (incl. silent tool calls)
+  tmuxbell --uninstall-hooks     remove the hooks added by --install-hooks
   tmuxbell -h | --help           this message
 
 Env:
@@ -42,6 +45,12 @@ Env:
 Web dashboard: http://localhost:\${TMUXBELL_PORT:-7681}
 EOF
     exit 0
+    ;;
+  --install-hooks)
+    exec node "$TMUXBELL_DIR/bin/tmuxbell-hooks.js" install
+    ;;
+  --uninstall-hooks)
+    exec node "$TMUXBELL_DIR/bin/tmuxbell-hooks.js" uninstall
     ;;
   --list)
     LIST_ONLY=1

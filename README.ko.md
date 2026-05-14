@@ -83,6 +83,28 @@ tmuxbell --list       # 세션 목록 + 대시보드 URL 출력
   굴리면 tmux copy mode 진입 + 히스토리 스크롤. 기본 off.
 - **언어 스위처** ([EN] / [한] / [中]) 사이드바 맨 아래; 브라우저별로 기억됩니다.
 
+## Claude Code 훅으로 정확도 높이기 (선택)
+
+출력 기반 감지는 "조용한 작업"을 놓칠 수 있습니다. 예를 들어 Claude가
+`Bash` 툴로 `sleep 30`을 돌리는 동안엔 터미널로 바이트가 안 나와서
+idle로 잡힙니다. 정확한 busy/idle 신호가 필요하면 작은 훅 2개를
+`~/.claude/settings.json`에 추가하세요:
+
+```bash
+tmuxbell --install-hooks    # UserPromptSubmit + Stop 훅 추가
+tmuxbell --uninstall-hooks  # 다시 제거
+```
+
+훅은 현재 tmux 세션 이름과 함께 대시보드에 curl을 쏘는 한 줄입니다.
+
+- `UserPromptSubmit` → `/claude/start` (Claude가 처리 시작)
+- `Stop` → `/claude/stop` (Claude 응답 끝 — 세션 옆에 ✓ 표시)
+
+훅 신호가 들어오면 출력 기반 추정보다 우선해서 적용되므로,
+출력이 없는 툴 호출 중에도 사이드바가 계속 magenta로 유지됩니다.
+기존 훅 설정은 건드리지 않고, tmuxbell이 추가한 항목만
+`# tmuxbell-hook-포트` 태그로 식별해 안전하게 제거 가능합니다.
+
 ## 환경변수
 
 | 이름 | 기본값 | 설명 |
