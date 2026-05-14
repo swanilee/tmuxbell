@@ -1,14 +1,17 @@
 /* sgtmux: Figma-inspired design tokens (from VoltAgent/awesome-design-md/figma) */
 
 :root {
-  /* colors */
-  --ink: #000000;
-  --canvas: #ffffff;
-  --inverse-canvas: #000000;
-  --inverse-ink: #ffffff;
-  --hairline: #e6e6e6;
-  --hairline-soft: #f1f1f1;
-  --surface-soft: #f7f7f5;
+  /* colors — dark theme (charcoal canvas, off-white ink) */
+  --ink: #f0f0f3;
+  --canvas: #1c1d22;
+  --inverse-canvas: #ffffff;
+  --inverse-ink: #1c1d22;
+  --hairline: #2e2f36;
+  --hairline-soft: #25262c;
+  --hairline-mid: #4a4b52;
+  --surface-soft: #25272d;
+  --surface-recessed: #15161a;
+  /* pastel blocks remain — used as accent cards on dark canvas */
   --block-lime: #dceeb1;
   --block-lilac: #c5b0f4;
   --block-cream: #f4ecd6;
@@ -175,7 +178,7 @@ button {
   background: var(--semantic-success);
   box-shadow: 0 0 0 3px rgba(30, 166, 74, 0.18);
 }
-.session-dot.unknown { background: var(--hairline); }
+.session-dot.unknown { background: var(--hairline-mid); }
 .session-name {
   flex: 1;
   font-size: 16px;
@@ -236,7 +239,8 @@ button {
   overflow: hidden;
 }
 .terminal-card {
-  background: var(--block-cream);
+  background: var(--surface-recessed);
+  border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
   padding: var(--s-lg);
   height: 100%;
@@ -265,6 +269,7 @@ button {
 }
 .empty-state-card {
   background: var(--block-lime);
+  color: var(--inverse-ink);
   border-radius: var(--r-lg);
   padding: var(--s-xxl);
   max-width: 480px;

@@ -105,10 +105,10 @@ function selectSession(name) {
     fontFamily: 'JetBrains Mono, ui-monospace, monospace',
     fontSize: 13,
     theme: {
-      background: '#f4ecd6',   // block-cream
-      foreground: '#000000',
-      cursor: '#000000',
-      selectionBackground: 'rgba(31, 29, 61, 0.18)',
+      background: '#15161a',   // surface-recessed (matches CSS)
+      foreground: '#f0f0f3',   // ink (off-white)
+      cursor: '#f0f0f3',
+      selectionBackground: 'rgba(240, 240, 243, 0.18)',
     },
     cursorBlink: true,
     scrollback: 10000,
