@@ -60,4 +60,13 @@ SGTMUX_PORT=7681 node server.js
 
 ## 라이선스
 
-MIT.
+MIT. 전체 라이선스 텍스트는 [`LICENSE`](./LICENSE).
+
+## 크레딧 / Third-Party
+
+전체 의존성 + 라이선스 출처는 [`CREDITS.md`](./CREDITS.md). 요약:
+
+- 런타임 npm: [express](https://github.com/expressjs/express), [ws](https://github.com/websockets/ws), [node-pty](https://github.com/microsoft/node-pty) — 모두 MIT
+- 프론트엔드 CDN: [xterm.js + addon-fit](https://github.com/xtermjs/xterm.js) (MIT), [Pretendard](https://github.com/orioncactus/pretendard) (OFL-1.1), [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (OFL-1.1)
+- 시스템 도구: [tmux](https://github.com/tmux/tmux) (ISC) — 자식 프로세스로 호출만, 번들하지 않음
+- 디자인 토큰: [VoltAgent/awesome-design-md (Figma)](https://github.com/VoltAgent/awesome-design-md/blob/main/design-md/figma/DESIGN.md) — MIT
