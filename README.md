@@ -2,6 +2,8 @@
 
 > 🌐 **English** · [한국어](README.ko.md) · [中文](README.zh.md)
 
+![tmuxbell dashboard](docs/landing.png)
+
 A clean web dashboard for tmux sessions running on a single server (or
 docker container). Each session shows a live activity light so you can
 juggle many parallel Claude / shell sessions and instantly see which
