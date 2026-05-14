@@ -62,6 +62,35 @@ If you call `tmuxbell NAME` without `-- CMD`, the new session auto-runs
 Set `TMUXBELL_DEFAULT_CMD` to change the global default, or use `-- CMD`
 for a one-off override.
 
+## Using the dashboard
+
+**Sidebar**
+- Each session row shows a status dot, the session name, and a window count.
+- Click the name to focus the session; expand the row to see every window
+  in that session, then click a window to jump straight to it.
+- Double-click any session or window name to rename it in place
+  (Enter to save, Esc to cancel).
+- Hover a row to reveal the **×** button for killing that session or window.
+
+**Main area**
+- A tab strip lists every window of the current session; click a tab to
+  switch the active window.
+- **+ New window** — modal with optional name, optional command
+  (default `claude`), and a checkbox to inherit the current window's
+  working directory.
+- **+ New session** — modal with optional name and an optional working
+  directory (the new session runs `claude` there).
+
+**Convenience controls**
+- The chevron at the left of the topbar **collapses the sidebar** so the
+  terminal can fill almost the whole window. Click again to restore.
+  Collapsed state is remembered.
+- **Mouse-wheel scrollback** toggle at the bottom of the sidebar — when
+  on, scrolling the wheel in any pane enters tmux's copy mode and walks
+  back through the pane's history. Off by default.
+- **Language switcher** ([EN] / [한] / [中]) at the very bottom of the
+  sidebar; the choice is remembered per browser.
+
 ## Environment variables
 
 | Name | Default | Description |
