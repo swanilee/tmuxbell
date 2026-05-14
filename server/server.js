@@ -656,6 +656,10 @@ wss.on('connection', (ws, req) => {
         const m = JSON.parse(s);
         if (m.resize && Array.isArray(m.resize)) {
           term.resize(m.resize[0], m.resize[1]);
+          // Resize triggers SIGWINCH → the pane app redraws → monitor pty
+          // sees that as output. Absorb it as a burst, not real activity.
+          startBurst(state);
+          burstAllWindowsOf(name);
           return;
         }
       } catch (_) {}
