@@ -22,16 +22,41 @@ DEFAULT_CMD="${SGTMUX_DEFAULT_CMD:-claude}"
 LIST_ONLY=0
 SESSION=""
 CMD=""
-if [[ "${1:-}" == "--list" ]]; then
-  LIST_ONLY=1
-elif [[ -n "${1:-}" ]]; then
-  SESSION="$1"
-  shift || true
-  if [[ "${1:-}" == "--" ]]; then
-    shift
-    CMD="$*"
-  fi
-fi
+case "${1:-}" in
+  -h|--help)
+    cat <<EOF
+sgtmux: tmux + web dashboard launcher
+
+Usage:
+  sgtmux                       attach/create auto-named session, run \$SGTMUX_DEFAULT_CMD (default: claude)
+  sgtmux NAME                  attach/create session NAME, run \$SGTMUX_DEFAULT_CMD
+  sgtmux NAME -- CMD ARGS...   attach/create NAME, run "CMD ARGS..." instead
+  sgtmux --list                print sessions + dashboard URL, do not attach
+  sgtmux -h | --help           this message
+
+Env:
+  SGTMUX_DIR          install root (default: ~/sgtmux)
+  SGTMUX_PORT         dashboard port (default: 7681)
+  SGTMUX_DEFAULT_CMD  command for new sessions (default: claude)
+
+Web dashboard: http://localhost:\${SGTMUX_PORT:-7681}
+EOF
+    exit 0
+    ;;
+  --list)
+    LIST_ONLY=1
+    ;;
+  "" )
+    ;;
+  *)
+    SESSION="$1"
+    shift || true
+    if [[ "${1:-}" == "--" ]]; then
+      shift
+      CMD="$*"
+    fi
+    ;;
+esac
 if [[ -z "$SESSION" && "$LIST_ONLY" -eq 0 ]]; then
   SESSION="claude-$(date +%H%M%S)"
 fi
