@@ -81,9 +81,7 @@ function endBurst(state, reason) {
   if (state.burstQuietTimer) { clearTimeout(state.burstQuietTimer); state.burstQuietTimer = null; }
   if (state.burstMaxTimer) { clearTimeout(state.burstMaxTimer); state.burstMaxTimer = null; }
   // Burst capped at MAX means the monitor pty kept getting output the whole
-  // time — that's a session genuinely streaming, not just a one-shot redraw.
-  // Carry that forward so the session doesn't briefly look idle (and trigger
-  // a false 'completion' check mark) right after the burst ends.
+  // time — safety net to keep the session looking active right after.
   if (reason === 'max') {
     const now = Date.now();
     state.prevOutputMs = state.lastOutputMs;
@@ -94,6 +92,11 @@ function endBurst(state, reason) {
 function startBurst(state) {
   endBurst(state);
   state.burstActive = true;
+  // Was the session already active right before this burst started? If so,
+  // output arriving during the burst is a *continuation* of real activity
+  // (not just a redraw artifact), so we should keep updating lastOutputMs.
+  state.burstWasActiveAtStart = state.lastOutputMs > 0 &&
+    (Date.now() - state.lastOutputMs) < IDLE_THRESHOLD_MS;
   state.burstQuietTimer = setTimeout(() => endBurst(state, 'quiet'), BURST_QUIET_MS);
   state.burstMaxTimer = setTimeout(() => endBurst(state, 'max'), BURST_MAX_MS);
 }
@@ -124,7 +127,14 @@ function ensureMonitor(name) {
     const now = Date.now();
     if (state.burstActive) {
       if (state.burstQuietTimer) clearTimeout(state.burstQuietTimer);
-      state.burstQuietTimer = setTimeout(() => endBurst(state), BURST_QUIET_MS);
+      state.burstQuietTimer = setTimeout(() => endBurst(state, 'quiet'), BURST_QUIET_MS);
+      // If the session was already active when this burst started, the
+      // output arriving now is a continuation, not a redraw artifact.
+      // Keep tracking it so the session doesn't flash idle mid-burst.
+      if (state.burstWasActiveAtStart && now - state.lastUserInputMs >= ECHO_SUPPRESS_MS) {
+        state.prevOutputMs = state.lastOutputMs;
+        state.lastOutputMs = now;
+      }
       return;
     }
     // Recent user input → this is shell echo of what they typed, not Claude
@@ -178,7 +188,12 @@ function trackWindow(session, idx) {
 const WINDOW_BURST_MS = 1000;
 function startWindowBurst(session, idx) {
   const ws = trackWindow(session, idx);
-  ws.burstUntil = Date.now() + WINDOW_BURST_MS;
+  const now = Date.now();
+  ws.burstUntil = now + WINDOW_BURST_MS;
+  // Remember whether the window was already active when the burst started.
+  // If so, hash changes during the burst are real activity, not a redraw.
+  ws.burstWasActiveAtStart = ws.lastChangeMs > 0 &&
+    (now - ws.lastChangeMs) < IDLE_THRESHOLD_MS;
 }
 function burstAllWindowsOf(session) {
   const allWindows = listAllWindows();
@@ -216,6 +231,12 @@ function pollWindowOnce(session, idx, isActiveWindow) {
   // During the post-switch burst, just refresh the baseline; don't count as
   // activity. (tmux may issue redraws to a freshly-deactivated pane.)
   if (now < state.burstUntil) {
+    // Unless the window was already active when the burst began — then
+    // ongoing changes are a continuation of real activity.
+    if (state.burstWasActiveAtStart && state.hash !== null && state.hash !== h) {
+      state.prevChangeMs = state.lastChangeMs;
+      state.lastChangeMs = now;
+    }
     state.hash = h;
     return;
   }
