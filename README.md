@@ -58,15 +58,22 @@ SGTMUX_PORT=7681 node server.js
 # 브라우저 http://localhost:7681
 ```
 
+## Acknowledgements
+
+> *Standing on the shoulders of giants.*
+
+이 프로젝트는 다음 오픈소스 프로젝트들의 훌륭한 작업이 없었다면
+존재할 수 없었습니다. 모든 메인테이너와 기여자분들께 깊은 감사를 드립니다.
+
+- **터미널 다중화**: [tmux](https://github.com/tmux/tmux) — 사실상 sgtmux의 모든 코어 기능은 tmux를 한 겹 감싼 것입니다.
+- **터미널 에뮬레이션**: [xterm.js](https://github.com/xtermjs/xterm.js) — 브라우저에 진짜 터미널을 가능하게 함.
+- **PTY 처리**: [node-pty](https://github.com/microsoft/node-pty) — Node에서 PTY를 다루는 표준 라이브러리.
+- **웹 서버**: [express](https://github.com/expressjs/express), [ws](https://github.com/websockets/ws)
+- **타이포그래피**: [Pretendard](https://github.com/orioncactus/pretendard), [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono)
+- **디자인 시스템**: [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md) — Figma 마케팅 사이트 디자인 토큰 참고.
+
+전체 라이선스·저작권 표기는 [`CREDITS.md`](./CREDITS.md) 참고.
+
 ## 라이선스
 
 MIT. 전체 라이선스 텍스트는 [`LICENSE`](./LICENSE).
-
-## 크레딧 / Third-Party
-
-전체 의존성 + 라이선스 출처는 [`CREDITS.md`](./CREDITS.md). 요약:
-
-- 런타임 npm: [express](https://github.com/expressjs/express), [ws](https://github.com/websockets/ws), [node-pty](https://github.com/microsoft/node-pty) — 모두 MIT
-- 프론트엔드 CDN: [xterm.js + addon-fit](https://github.com/xtermjs/xterm.js) (MIT), [Pretendard](https://github.com/orioncactus/pretendard) (OFL-1.1), [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (OFL-1.1)
-- 시스템 도구: [tmux](https://github.com/tmux/tmux) (ISC) — 자식 프로세스로 호출만, 번들하지 않음
-- 디자인 토큰: [VoltAgent/awesome-design-md (Figma)](https://github.com/VoltAgent/awesome-design-md/blob/main/design-md/figma/DESIGN.md) — MIT
