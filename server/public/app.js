@@ -254,15 +254,15 @@ function updateWindowSublist(ul, sessionName, windows) {
       if (nameEl && nameEl.textContent !== wantName) nameEl.textContent = wantName;
     }
 
-    // status classes
+    // status classes — busy/check apply only to non-active windows
     const wantActiveTab = !!w.active && state.current === sessionName;
     el.classList.toggle('active', wantActiveTab);
-    el.classList.toggle('window-busy', w.status === 'active');
+    el.classList.toggle('window-busy', w.status === 'active' && !wantActiveTab);
 
     // status icon slot (spinner not used here — text color is the cue)
     const iconEl = el.querySelector('.window-row-icon');
     let wantType = 'none';
-    if (w.hasUnseenCompletion && w.status !== 'active') wantType = 'check';
+    if (w.hasUnseenCompletion && w.status !== 'active' && !wantActiveTab) wantType = 'check';
     if (iconEl && iconEl.dataset.type !== wantType) {
       iconEl.dataset.type = wantType;
       iconEl.innerHTML = '';

@@ -145,9 +145,21 @@ function trackWindow(session, idx) {
       prevStatus: 'unknown',
       completedAt: 0,
       acknowledgedAt: 0,
+      burstUntil: 0,
     });
   }
   return windowStates.get(k);
+}
+
+const WINDOW_BURST_MS = 1000;
+function startWindowBurst(session, idx) {
+  const ws = trackWindow(session, idx);
+  ws.burstUntil = Date.now() + WINDOW_BURST_MS;
+}
+function burstAllWindowsOf(session) {
+  const allWindows = listAllWindows();
+  const wins = allWindows.get(session) || [];
+  for (const w of wins) startWindowBurst(session, w.index);
 }
 
 function hashString(s) {
@@ -157,6 +169,15 @@ function hashString(s) {
 }
 
 function pollWindowOnce(session, idx, isActiveWindow) {
+  const state = trackWindow(session, idx);
+  // Active window's activity is already tracked at the session level via the
+  // monitor pty. Skip capture-pane for it AND reset its hash, so when it
+  // becomes inactive later, the next poll just establishes a baseline rather
+  // than reporting a (false) change.
+  if (isActiveWindow) {
+    state.hash = null;
+    return;
+  }
   let content;
   try {
     content = execSync(
@@ -167,15 +188,15 @@ function pollWindowOnce(session, idx, isActiveWindow) {
     return;
   }
   const h = hashString(content);
-  const state = trackWindow(session, idx);
   const now = Date.now();
+  // During the post-switch burst, just refresh the baseline; don't count as
+  // activity. (tmux may issue redraws to a freshly-deactivated pane.)
+  if (now < state.burstUntil) {
+    state.hash = h;
+    return;
+  }
   if (state.hash !== null && state.hash !== h) {
-    const sessionState = sessions.get(session);
-    const sinceUserInput = sessionState
-      ? now - sessionState.lastUserInputMs
-      : Number.POSITIVE_INFINITY;
-    const isEcho = isActiveWindow && sinceUserInput < ECHO_SUPPRESS_MS;
-    if (!isEcho) state.lastChangeMs = now;
+    state.lastChangeMs = now;
   }
   state.hash = h;
 }
@@ -435,6 +456,9 @@ app.post('/api/sessions/:name/windows', (req, res) => {
       { encoding: 'utf8', stdio: ['ignore','pipe','ignore'] }
     ).trim();
     const newIdx = parseInt(out, 10);
+    const state = sessions.get(name);
+    if (state) startBurst(state);
+    burstAllWindowsOf(name);
     res.json({ ok: true, index: isNaN(newIdx) ? null : newIdx });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.stderr ? e.stderr.toString() : String(e) });
@@ -447,6 +471,9 @@ app.post('/api/sessions/:name/windows/:idx/kill', (req, res) => {
   if (!isValidName(name) || isNaN(idx)) return res.status(400).json({ ok: false, error: 'invalid params' });
   try {
     execSync(`${TMUX} kill-window -t ${JSON.stringify(name + ':' + idx)}`, { stdio: 'ignore' });
+    const state = sessions.get(name);
+    if (state) startBurst(state);
+    burstAllWindowsOf(name);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.stderr ? e.stderr.toString() : String(e) });
@@ -463,6 +490,11 @@ app.post('/api/sessions/:name/windows/:idx/select', (req, res) => {
     // for attached clients. Absorb it so we don't false-positive "active".
     const state = sessions.get(name);
     if (state) startBurst(state);
+    // tmux may also issue redraws to neighboring panes (deactivated window
+    // resize, etc.). Suppress per-window activity tracking briefly for ALL
+    // windows of this session so the switch itself doesn't paint anything
+    // magenta.
+    burstAllWindowsOf(name);
     // The user is viewing this window now → ack any unseen completion on it
     const ws = trackWindow(name, idx);
     ws.acknowledgedAt = Date.now();
