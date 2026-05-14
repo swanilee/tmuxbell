@@ -343,6 +343,17 @@ function tmuxList() {
     // Enrich window list with per-window status + completion
     const sessionIsViewed = state && state.ptys.size > 0;
     const windowList = (allWindows.get(name) || []).map(w => {
+      // Active window: use session-level signal (the monitor pty + burst
+      // protection there already handles user typing echo and switching
+      // redraws correctly). User is also looking at it, so completion is
+      // immediately acked.
+      if (w.active) {
+        return {
+          ...w,
+          status,
+          hasUnseenCompletion: false,
+        };
+      }
       const ws = trackWindow(name, w.index);
       const wIdleMs = ws.lastChangeMs ? now - ws.lastChangeMs : null;
       let wStatus = 'unknown';
@@ -351,8 +362,6 @@ function tmuxList() {
       }
       if (ws.prevStatus === 'active' && wStatus === 'idle') {
         ws.completedAt = now;
-        // Auto-ack if user is actually looking at this window right now
-        if (sessionIsViewed && w.active) ws.acknowledgedAt = now;
       }
       ws.prevStatus = wStatus;
       const wHasUnseen = ws.completedAt > ws.acknowledgedAt;
