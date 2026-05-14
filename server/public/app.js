@@ -335,6 +335,16 @@ async function refreshWindows() {
     }
   }
 
+  // re-order panel DOM children to match window index order
+  const ordered = windows
+    .map(w => state.panels.get(w.index)?.container)
+    .filter(Boolean);
+  for (let i = 0; i < ordered.length; i++) {
+    if (mainContentEl.children[i] !== ordered[i]) {
+      mainContentEl.insertBefore(ordered[i], mainContentEl.children[i] || null);
+    }
+  }
+
   // if zero windows somehow → empty state
   if (state.panels.size === 0) showEmptyState();
 }
@@ -454,7 +464,9 @@ modalCreate.addEventListener('click', async () => {
     if (!j.ok) { alert('생성 실패: ' + (j.error || 'unknown')); return; }
     closeNewWindowModal();
     state.windowsKey = '';
-    refreshWindows();
+    await refreshWindows();
+    // tmux may need a tick to register; refresh once more shortly after
+    setTimeout(() => { state.windowsKey = ''; refreshWindows(); }, 300);
   } catch (e) {
     alert('요청 실패: ' + e.message);
   } finally {

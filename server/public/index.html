@@ -56,8 +56,9 @@
         <span>현재 윈도우의 작업 디렉토리(CWD) 이어받기</span>
       </label>
       <label class="field">
-        <span class="field-label">실행 명령 (선택)</span>
-        <input type="text" id="newWindowCmd" placeholder="비워두면 claude" class="text-input" />
+        <span class="field-label">새 윈도우에서 실행할 명령 (선택)</span>
+        <input type="text" id="newWindowCmd" placeholder="비워두면 claude. 예: bash, htop, vim foo.py" class="text-input" />
+        <span class="field-help">새 윈도우가 열리면 이 명령이 자동 실행됩니다. 그냥 셸이 필요하면 <code>bash</code>.</span>
       </label>
       <div class="modal-actions">
         <button class="btn-tertiary" data-modal-close>취소</button>

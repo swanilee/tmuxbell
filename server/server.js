@@ -357,11 +357,13 @@ wss.on('connection', (ws, req) => {
 
   // Pick the attach target:
   //   - if window=IDX given: ensure a per-window linked view session
-  //     and attach to it (its active window is pinned to IDX).
+  //     and attach to it pinned at SESSION:WINDOW so this pty cannot
+  //     accidentally share state with another panel.
   //   - else attach directly to parent (legacy / single-panel mode).
   let attachTarget = name;
   if (windowIdx != null && !isNaN(windowIdx)) {
-    attachTarget = ensureViewSession(name, windowIdx);
+    const view = ensureViewSession(name, windowIdx);
+    attachTarget = `${view}:${windowIdx}`;
   }
 
   const term = pty.spawn(TMUX, ['attach', '-t', attachTarget], {

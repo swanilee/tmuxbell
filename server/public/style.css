@@ -439,6 +439,18 @@ button {
   gap: var(--s-sm);
   font-size: 14px;
 }
+.field-help {
+  font-size: 12px;
+  opacity: 0.65;
+  line-height: 1.4;
+}
+.field-help code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(255,255,255,0.06);
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+}
 .text-input {
   background: var(--surface-recessed);
   color: var(--ink);
