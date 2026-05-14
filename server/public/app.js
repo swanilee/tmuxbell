@@ -113,20 +113,29 @@ function createSessionItem(s) {
   li.className = 'session-item';
   li.dataset.name = s.name;
 
+  // Header row
+  const header = document.createElement('div');
+  header.className = 'session-row';
+  li.appendChild(header);
+
   const dot = document.createElement('div');
   dot.className = 'session-dot';
-  li.appendChild(dot);
+  header.appendChild(dot);
 
   const name = document.createElement('div');
   name.className = 'session-name';
   name.textContent = s.name;
-  li.appendChild(name);
+  header.appendChild(name);
+
+  const count = document.createElement('span');
+  count.className = 'session-count';
+  header.appendChild(count);
 
   // status icon slot (spinner / check / attached-dot / nothing)
   const icon = document.createElement('div');
   icon.className = 'session-status-icon';
   icon.dataset.type = '';
-  li.appendChild(icon);
+  header.appendChild(icon);
 
   const del = document.createElement('button');
   del.className = 'session-delete';
@@ -137,9 +146,14 @@ function createSessionItem(s) {
     ev.stopPropagation();
     killSession(s.name);
   });
-  li.appendChild(del);
+  header.appendChild(del);
 
-  li.addEventListener('click', () => selectSession(s.name));
+  header.addEventListener('click', () => selectSession(s.name));
+
+  // Nested window list
+  const subList = document.createElement('ul');
+  subList.className = 'window-sublist';
+  li.appendChild(subList);
 
   updateSessionItem(li, s);
   return li;
@@ -152,19 +166,26 @@ function updateSessionItem(li, s) {
     li.classList.toggle('selected', selected);
   }
 
-  // status dot class
-  const dot = li.firstElementChild; // .session-dot
+  const header = li.querySelector('.session-row');
+  const dot = header && header.querySelector('.session-dot');
   const wantDotClass = `session-dot ${s.status}`;
   if (dot && dot.className !== wantDotClass) dot.className = wantDotClass;
   if (dot && dot.title !== s.status) dot.title = s.status;
 
-  // status icon slot — only swap contents when the type changes
-  const icon = li.querySelector('.session-status-icon');
+  // window count badge
+  const countEl = header && header.querySelector('.session-count');
+  const wins = s.windows || [];
+  if (countEl) {
+    const want = `(${wins.length})`;
+    if (countEl.textContent !== want) countEl.textContent = want;
+  }
+
+  // status icon slot
+  const icon = header && header.querySelector('.session-status-icon');
   let wantType = 'none';
   if (s.status === 'active') wantType = 'spinner';
   else if (s.hasUnseenCompletion) wantType = 'check';
   else if (s.attached) wantType = 'attached';
-
   if (icon && icon.dataset.type !== wantType) {
     icon.dataset.type = wantType;
     icon.innerHTML = '';
@@ -185,6 +206,61 @@ function updateSessionItem(li, s) {
       d.textContent = '●';
       d.title = 'attached';
       icon.appendChild(d);
+    }
+  }
+
+  // sub-list of windows (diffed)
+  const subList = li.querySelector('.window-sublist');
+  if (subList) updateWindowSublist(subList, s.name, wins);
+}
+
+function updateWindowSublist(ul, sessionName, windows) {
+  const existing = new Map();
+  for (const el of Array.from(ul.children)) {
+    if (el.dataset.idx != null) existing.set(parseInt(el.dataset.idx, 10), el);
+  }
+  for (const w of windows) {
+    let el = existing.get(w.index);
+    if (!el) {
+      el = document.createElement('li');
+      el.className = 'window-row';
+      el.dataset.idx = String(w.index);
+      const idxEl = document.createElement('span');
+      idxEl.className = 'window-row-idx';
+      idxEl.textContent = `#${w.index}`;
+      const nameEl = document.createElement('span');
+      nameEl.className = 'window-row-name';
+      nameEl.textContent = w.name || `window-${w.index}`;
+      el.appendChild(idxEl);
+      el.appendChild(nameEl);
+      el.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (state.current !== sessionName) {
+          selectSession(sessionName);
+          // selectSession opens panel; queue window switch after a tick
+          setTimeout(() => selectWindow(w.index), 50);
+        } else {
+          selectWindow(w.index);
+        }
+      });
+      ul.appendChild(el);
+    } else {
+      existing.delete(w.index);
+      const nameEl = el.querySelector('.window-row-name');
+      const wantName = w.name || `window-${w.index}`;
+      if (nameEl && nameEl.textContent !== wantName) nameEl.textContent = wantName;
+    }
+    const wantActive = !!w.active && state.current === sessionName;
+    if (el.classList.contains('active') !== wantActive) {
+      el.classList.toggle('active', wantActive);
+    }
+  }
+  for (const el of existing.values()) el.remove();
+  // re-order to match windows[]
+  for (let i = 0; i < windows.length; i++) {
+    const want = ul.querySelector(`[data-idx="${windows[i].index}"]`);
+    if (want && ul.children[i] !== want) {
+      ul.insertBefore(want, ul.children[i] || null);
     }
   }
 }

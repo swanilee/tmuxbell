@@ -150,6 +150,12 @@ button {
 }
 .session-item {
   display: flex;
+  flex-direction: column;
+  border-radius: var(--r-md);
+  position: relative;
+}
+.session-row {
+  display: flex;
   align-items: center;
   gap: var(--s-sm);
   padding: var(--s-sm) var(--s-md);
@@ -157,14 +163,63 @@ button {
   cursor: pointer;
   transition: background 0.1s;
   border: 1px solid transparent;
-  position: relative;
 }
-.session-item:hover { background: var(--surface-soft); }
-.session-item.selected {
+.session-row:hover { background: var(--surface-soft); }
+.session-item.selected > .session-row {
   background: var(--surface-soft);
   border-color: var(--hairline);
 }
-.session-item:hover .session-delete { opacity: 1; }
+.session-row:hover .session-delete { opacity: 1; }
+.session-count {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--ink);
+  opacity: 0.5;
+  font-weight: 500;
+}
+
+/* nested window list inside a session item */
+.window-sublist {
+  list-style: none;
+  padding: 0;
+  margin: 2px 0 var(--s-xs) 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-left: 1px solid var(--hairline-soft);
+  padding-left: var(--s-xs);
+}
+.window-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-xs);
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink);
+  opacity: 0.6;
+  transition: background 0.1s, opacity 0.1s;
+}
+.window-row:hover { background: var(--surface-soft); opacity: 1; }
+.window-row.active {
+  background: var(--surface-soft);
+  opacity: 1;
+  font-weight: 500;
+}
+.window-row-idx {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.window-row.active .window-row-idx { opacity: 1; }
+.window-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .session-dot {
   width: 10px;
   height: 10px;

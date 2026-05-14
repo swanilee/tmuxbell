@@ -176,6 +176,31 @@ function cleanupLegacyViewSessions() {
 }
 cleanupLegacyViewSessions();
 
+function listAllWindows() {
+  try {
+    const out = execSync(
+      `${TMUX} list-windows -a -F '#{session_name}|#{window_index}|#{window_name}|#{window_active}'`,
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    ).trim();
+    const bySession = new Map();
+    if (!out) return bySession;
+    for (const line of out.split('\n')) {
+      const [name, idx, wname, active] = line.split('|');
+      if (!name) continue;
+      if (!bySession.has(name)) bySession.set(name, []);
+      bySession.get(name).push({
+        index: parseInt(idx, 10),
+        name: wname,
+        active: active === '1',
+      });
+    }
+    for (const arr of bySession.values()) arr.sort((a, b) => a.index - b.index);
+    return bySession;
+  } catch (_) {
+    return new Map();
+  }
+}
+
 function tmuxList() {
   let out;
   try {
@@ -191,6 +216,7 @@ function tmuxList() {
     cleanupMonitors(new Set());
     return [];
   }
+  const allWindows = listAllWindows();
   const now = Date.now();
   const names = new Set();
   const parsed = out.split('\n')
@@ -229,6 +255,7 @@ function tmuxList() {
       idleMs,
       status,
       hasUnseenCompletion: !!hasUnseenCompletion,
+      windows: allWindows.get(name) || [],
     };
   });
   cleanupMonitors(names);
