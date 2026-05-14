@@ -22,11 +22,20 @@ const pty = require('node-pty');
 const PORT = parseInt(process.env.SGTMUX_PORT || '7681', 10);
 const TMUX = 'tmux';
 const IDLE_THRESHOLD_MS = 1500;
+// New WS attach causes tmux to dump a full-screen redraw. Suppress activity
+// detection for this window so switching sessions doesn't false-positive
+// "Claude is responding."
+const ATTACH_GRACE_MS = 500;
 
 const sessions = new Map();
 function trackSession(name) {
   if (!sessions.has(name)) {
-    sessions.set(name, { lastOutputMs: 0, ptys: new Set(), bellAt: 0 });
+    sessions.set(name, {
+      lastOutputMs: 0,
+      ptys: new Set(),
+      bellAt: 0,
+      attachGraceUntil: 0,
+    });
   }
   return sessions.get(name);
 }
@@ -129,10 +138,15 @@ wss.on('connection', (ws, req) => {
 
   const state = trackSession(name);
   state.ptys.add(term);
+  // Start an attach-grace window. Output during this window is *displayed*
+  // but does not count as "Claude is producing output" — it's just tmux
+  // repainting the screen for the new client.
+  state.attachGraceUntil = Date.now() + ATTACH_GRACE_MS;
 
   term.onData(data => {
-    state.lastOutputMs = Date.now();
-    if (data.includes('\x07')) state.bellAt = Date.now();
+    const now = Date.now();
+    if (now >= state.attachGraceUntil) state.lastOutputMs = now;
+    if (data.includes('\x07')) state.bellAt = now;
     try { ws.send(data); } catch (_) {}
   });
 

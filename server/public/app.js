@@ -66,13 +66,59 @@ function renderSessions(list) {
     name.textContent = s.name;
     li.appendChild(name);
 
-    const meta = document.createElement('div');
-    meta.className = 'session-meta';
-    if (s.attached) meta.textContent = '●';
-    li.appendChild(meta);
+    if (s.status === 'active') {
+      const spin = document.createElement('div');
+      spin.className = 'session-spinner';
+      spin.title = '응답 중';
+      li.appendChild(spin);
+    } else if (s.attached) {
+      const meta = document.createElement('div');
+      meta.className = 'session-meta';
+      meta.textContent = '●';
+      meta.title = 'attached';
+      li.appendChild(meta);
+    }
+
+    const del = document.createElement('button');
+    del.className = 'session-delete';
+    del.type = 'button';
+    del.textContent = '×';
+    del.title = '세션 종료';
+    del.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      killSession(s.name);
+    });
+    li.appendChild(del);
 
     li.addEventListener('click', () => selectSession(s.name));
     sessionListEl.appendChild(li);
+  }
+}
+
+async function killSession(name) {
+  if (!confirm(`세션 "${name}"를 종료할까요?`)) return;
+  try {
+    const r = await fetch(`/api/sessions/${encodeURIComponent(name)}/kill`, { method: 'POST' });
+    const j = await r.json();
+    if (!j.ok) { alert('종료 실패: ' + (j.error || 'unknown')); return; }
+    if (state.current === name) {
+      state.current = null;
+      currentEl.textContent = '세션을 선택하세요';
+      killBtn.hidden = true;
+      if (state.ws) { try { state.ws.close(); } catch (_) {} state.ws = null; }
+      if (state.term) { try { state.term.dispose(); } catch (_) {} state.term = null; }
+      mainContentEl.className = 'empty-state';
+      mainContentEl.innerHTML = `
+        <div class="empty-state-card">
+          <h2 class="empty-state-title">왼쪽에서 세션을 선택하거나 새로 만드세요</h2>
+          <p class="empty-state-body">
+            터미널에서 <code>sgtmux</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.
+          </p>
+        </div>`;
+    }
+    await fetchSessions();
+  } catch (e) {
+    alert('요청 실패: ' + e.message);
   }
 }
 
@@ -168,28 +214,8 @@ newBtn.addEventListener('click', async () => {
   }
 });
 
-killBtn.addEventListener('click', async () => {
-  if (!state.current) return;
-  if (!confirm(`세션 "${state.current}"를 종료할까요?`)) return;
-  try {
-    await fetch(`/api/sessions/${encodeURIComponent(state.current)}/kill`, { method: 'POST' });
-    state.current = null;
-    currentEl.textContent = '세션을 선택하세요';
-    killBtn.hidden = true;
-    if (state.ws) { try { state.ws.close(); } catch (_) {} state.ws = null; }
-    if (state.term) { try { state.term.dispose(); } catch (_) {} state.term = null; }
-    mainContentEl.className = 'empty-state';
-    mainContentEl.innerHTML = `
-      <div class="empty-state-card">
-        <h2 class="empty-state-title">왼쪽에서 세션을 선택하거나 새로 만드세요</h2>
-        <p class="empty-state-body">
-          터미널에서 <code>sgtmux</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.
-        </p>
-      </div>`;
-    await fetchSessions();
-  } catch (e) {
-    alert('종료 실패: ' + e.message);
-  }
+killBtn.addEventListener('click', () => {
+  if (state.current) killSession(state.current);
 });
 
 // boot

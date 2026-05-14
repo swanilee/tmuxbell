@@ -156,12 +156,14 @@ button {
   cursor: pointer;
   transition: background 0.1s;
   border: 1px solid transparent;
+  position: relative;
 }
 .session-item:hover { background: var(--surface-soft); }
 .session-item.selected {
   background: var(--surface-soft);
   border-color: var(--hairline);
 }
+.session-item:hover .session-delete { opacity: 1; }
 .session-dot {
   width: 10px;
   height: 10px;
@@ -193,6 +195,40 @@ button {
   font-size: 11px;
   color: var(--ink);
   opacity: 0.5;
+}
+
+/* spinner indicating Claude is producing output */
+.session-spinner {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+  border-top-color: var(--accent-magenta);
+  border-right-color: var(--accent-magenta);
+  border-radius: var(--r-full);
+  animation: sg-spin 0.7s linear infinite;
+}
+@keyframes sg-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* per-row delete button (visible on hover) */
+.session-delete {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-full);
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s;
+  font-size: 16px;
+  line-height: 1;
+}
+.session-delete:hover {
+  background: var(--surface-recessed);
+  color: var(--accent-magenta);
 }
 
 /* ---------- Buttons (Figma pill) ---------- */
