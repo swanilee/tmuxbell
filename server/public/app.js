@@ -659,6 +659,44 @@ modalCreate.addEventListener('click', async () => {
 
 startWindowsPolling();
 
+// ── Sidebar collapse toggle ─────────────────────────────────────────
+const appEl = document.querySelector('.app');
+const sidebarToggle = document.getElementById('sidebarToggle');
+
+function refitTerminalAfterTransition() {
+  // wait for CSS transition (0.2s) to finish, then refit xterm so the
+  // terminal expands to fill the new available width
+  setTimeout(() => {
+    const p = state.panel;
+    if (!p) return;
+    try {
+      p.fitAddon.fit();
+      const { cols, rows } = p.term;
+      if (p.ws && p.ws.readyState === 1) {
+        p.ws.send(JSON.stringify({ resize: [cols, rows] }));
+      }
+    } catch (_) {}
+  }, 230);
+}
+
+function setSidebarCollapsed(collapsed) {
+  appEl.classList.toggle('sidebar-collapsed', collapsed);
+  try { localStorage.setItem('tmuxbellSidebar', collapsed ? 'collapsed' : 'open'); } catch (_) {}
+  refitTerminalAfterTransition();
+}
+
+if (sidebarToggle) {
+  sidebarToggle.addEventListener('click', () => {
+    setSidebarCollapsed(!appEl.classList.contains('sidebar-collapsed'));
+  });
+}
+// restore previous state
+try {
+  if (localStorage.getItem('tmuxbellSidebar') === 'collapsed') {
+    appEl.classList.add('sidebar-collapsed');
+  }
+} catch (_) {}
+
 // ── Language switcher ───────────────────────────────────────────────
 const langSwitcher = document.getElementById('langSwitcher');
 if (langSwitcher) {
