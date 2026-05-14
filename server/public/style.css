@@ -445,21 +445,22 @@ button {
   background: var(--block-lime);
   color: var(--inverse-ink);
   border-radius: var(--r-lg);
-  padding: var(--s-xxl);
-  max-width: 480px;
+  padding: var(--s-xxl) 56px;
+  max-width: 720px;
   text-align: center;
 }
 .empty-state-title {
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 540;
-  letter-spacing: -0.26px;
+  letter-spacing: -0.2px;
   margin: 0 0 var(--s-md) 0;
+  white-space: nowrap;
 }
 .empty-state-body {
-  font-size: 18px;
-  font-weight: 320;
-  line-height: 1.45;
-  letter-spacing: -0.26px;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: -0.1px;
   margin: 0;
 }
 .empty-state-body code {
