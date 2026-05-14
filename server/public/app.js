@@ -186,12 +186,11 @@ function updateSessionItem(li, s) {
     if (countEl.textContent !== want) countEl.textContent = want;
   }
 
-  // status icon slot
+  // status icon slot (spinner / check / nothing)
   const icon = header && header.querySelector('.session-status-icon');
   let wantType = 'none';
   if (s.status === 'active') wantType = 'spinner';
   else if (s.hasUnseenCompletion) wantType = 'check';
-  else if (s.attached) wantType = 'attached';
   if (icon && icon.dataset.type !== wantType) {
     icon.dataset.type = wantType;
     icon.innerHTML = '';
@@ -205,12 +204,6 @@ function updateSessionItem(li, s) {
       d.className = 'session-check';
       d.textContent = '✓';
       d.title = '응답 완료 — 확인 안 함';
-      icon.appendChild(d);
-    } else if (wantType === 'attached') {
-      const d = document.createElement('div');
-      d.className = 'session-meta';
-      d.textContent = '●';
-      d.title = 'attached';
       icon.appendChild(d);
     }
   }
