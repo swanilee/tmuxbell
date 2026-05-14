@@ -1,4 +1,4 @@
-# tmuxbell
+# 🔔 tmuxbell
 
 서버 한 대(또는 docker container 한 개) 안에서 도는 tmux 세션들을, Figma 풍의 깔끔한 웹 UI로 모아 보고 조작하는 도구.
 
