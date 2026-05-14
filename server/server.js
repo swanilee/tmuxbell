@@ -68,17 +68,26 @@ function trackSession(name) {
   return sessions.get(name);
 }
 
-function endBurst(state) {
+function endBurst(state, reason) {
   state.burstActive = false;
   if (state.burstQuietTimer) { clearTimeout(state.burstQuietTimer); state.burstQuietTimer = null; }
   if (state.burstMaxTimer) { clearTimeout(state.burstMaxTimer); state.burstMaxTimer = null; }
+  // Burst capped at MAX means the monitor pty kept getting output the whole
+  // time — that's a session genuinely streaming, not just a one-shot redraw.
+  // Carry that forward so the session doesn't briefly look idle (and trigger
+  // a false 'completion' check mark) right after the burst ends.
+  if (reason === 'max') {
+    const now = Date.now();
+    state.prevOutputMs = state.lastOutputMs;
+    state.lastOutputMs = now;
+  }
 }
 
 function startBurst(state) {
   endBurst(state);
   state.burstActive = true;
-  state.burstQuietTimer = setTimeout(() => endBurst(state), BURST_QUIET_MS);
-  state.burstMaxTimer = setTimeout(() => endBurst(state), BURST_MAX_MS);
+  state.burstQuietTimer = setTimeout(() => endBurst(state, 'quiet'), BURST_QUIET_MS);
+  state.burstMaxTimer = setTimeout(() => endBurst(state, 'max'), BURST_MAX_MS);
 }
 
 // Spawn a background read-only tmux attach for a session, so we can track
