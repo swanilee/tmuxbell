@@ -22,21 +22,23 @@ const pty = require('node-pty');
 const PORT = parseInt(process.env.SGTMUX_PORT || '7681', 10);
 const TMUX = 'tmux';
 const IDLE_THRESHOLD_MS = 1500;
-// When a new WS attaches, tmux dumps a full-screen redraw. We mark the
-// session "in burst" and only treat output as genuine activity once the
-// burst ends. A burst ends when either:
-//   - 500ms passes without any output (tmux is done repainting), OR
-//   - 3 seconds have elapsed total (safety cap so real streaming can't be
-//     masked indefinitely).
+// Burst detection: when a fresh tmux attach (monitor or WS client) happens,
+// tmux dumps a screen redraw. Output during that burst doesn't count as
+// "Claude is responding". Burst ends when 500ms of quiet passes OR 3s cap.
 const BURST_QUIET_MS = 500;
 const BURST_MAX_MS = 3000;
+// Suppress output for this long after a keystroke — terminal echo of what
+// the user just typed is not Claude's output.
+const ECHO_SUPPRESS_MS = 250;
 
 const sessions = new Map();
 function trackSession(name) {
   if (!sessions.has(name)) {
     sessions.set(name, {
       lastOutputMs: 0,
-      ptys: new Set(),
+      lastUserInputMs: 0,
+      ptys: new Set(),       // WS-driven view ptys
+      monitorPty: null,      // background read-only attach
       bellAt: 0,
       burstActive: false,
       burstQuietTimer: null,
@@ -59,6 +61,56 @@ function startBurst(state) {
   state.burstMaxTimer = setTimeout(() => endBurst(state), BURST_MAX_MS);
 }
 
+// Spawn a background read-only tmux attach for a session, so we can track
+// pane output even when no UI client is connected. The monitor stays alive
+// across WS client come/go.
+function ensureMonitor(name) {
+  const state = trackSession(name);
+  if (state.monitorPty) return;
+  let mon;
+  try {
+    mon = pty.spawn(TMUX, ['attach', '-t', name, '-r'], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: process.env.HOME,
+      env: process.env,
+    });
+  } catch (e) {
+    console.error(`[sgtmux] failed to spawn monitor for ${name}:`, e.message);
+    return;
+  }
+  state.monitorPty = mon;
+  startBurst(state);
+
+  mon.onData(data => {
+    const now = Date.now();
+    if (state.burstActive) {
+      if (state.burstQuietTimer) clearTimeout(state.burstQuietTimer);
+      state.burstQuietTimer = setTimeout(() => endBurst(state), BURST_QUIET_MS);
+      return;
+    }
+    // Recent user input → this is shell echo of what they typed, not Claude
+    if (now - state.lastUserInputMs < ECHO_SUPPRESS_MS) return;
+    state.lastOutputMs = now;
+    if (data.includes('\x07')) state.bellAt = now;
+  });
+
+  mon.onExit(() => {
+    state.monitorPty = null;
+    endBurst(state);
+  });
+}
+
+function cleanupMonitors(currentNames) {
+  for (const [name, state] of sessions.entries()) {
+    if (!currentNames.has(name) && state.monitorPty) {
+      try { state.monitorPty.kill(); } catch (_) {}
+      state.monitorPty = null;
+    }
+  }
+}
+
 function tmuxList() {
   let out;
   try {
@@ -67,12 +119,21 @@ function tmuxList() {
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
     ).trim();
   } catch (e) {
+    cleanupMonitors(new Set());
     return [];
   }
-  if (!out) return [];
+  if (!out) {
+    cleanupMonitors(new Set());
+    return [];
+  }
   const now = Date.now();
-  return out.split('\n').map(line => {
+  const names = new Set();
+  const parsed = out.split('\n').map(line => {
     const [name, created, attached, activity] = line.split('|');
+    names.add(name);
+    // Make sure every visible session has a monitor so we keep tracking
+    // output even without an open WS view.
+    ensureMonitor(name);
     const state = sessions.get(name);
     const lastOutputMs = state ? state.lastOutputMs : 0;
     const idleMs = lastOutputMs ? now - lastOutputMs : null;
@@ -90,6 +151,8 @@ function tmuxList() {
       status,
     };
   });
+  cleanupMonitors(names);
+  return parsed;
 }
 
 const app = express();
@@ -157,21 +220,11 @@ wss.on('connection', (ws, req) => {
 
   const state = trackSession(name);
   state.ptys.add(term);
-  // Output that arrives between WS attach and the redraw burst settling is
-  // "tmux repainting for the new client", not genuine activity. Burst is
-  // active until 500ms of quiet OR 3s safety cap.
-  startBurst(state);
+  // The background monitor pty is the source of truth for activity.
+  // This WS pty only forwards bytes to the client.
+  ensureMonitor(name);
 
   term.onData(data => {
-    const now = Date.now();
-    if (state.burstActive) {
-      // still in redraw burst — extend the quiet timer, don't count as activity
-      if (state.burstQuietTimer) clearTimeout(state.burstQuietTimer);
-      state.burstQuietTimer = setTimeout(() => endBurst(state), BURST_QUIET_MS);
-    } else {
-      state.lastOutputMs = now;
-    }
-    if (data.includes('\x07')) state.bellAt = now;
     try { ws.send(data); } catch (_) {}
   });
 
@@ -192,6 +245,8 @@ wss.on('connection', (ws, req) => {
         }
       } catch (_) {}
     }
+    // User is typing — flag so the imminent echo doesn't get classified as activity
+    state.lastUserInputMs = Date.now();
     term.write(s);
   });
 
