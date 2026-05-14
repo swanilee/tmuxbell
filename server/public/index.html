@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sgtmux</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@320;330;340;480;540;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <header class="brand">
+        <div class="brand-mark">▪</div>
+        <div class="brand-name">sgtmux</div>
+        <div class="brand-host" id="host">—</div>
+      </header>
+      <div class="eyebrow">SESSIONS</div>
+      <ul class="session-list" id="sessionList"></ul>
+      <button class="btn-primary" id="newSessionBtn">+ 새 세션</button>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-title" id="currentSession">세션을 선택하세요</div>
+        <div class="topbar-actions">
+          <button class="btn-tertiary" id="killBtn" hidden>종료</button>
+        </div>
+      </header>
+      <div id="mainContent" class="empty-state">
+        <div class="empty-state-card">
+          <h2 class="empty-state-title">왼쪽에서 세션을 선택하거나 새로 만드세요</h2>
+          <p class="empty-state-body">
+            터미널에서 <code>sgtmux</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.
+            여기서 세션 점이 <strong>녹색</strong>이면 응답 대기 중, <strong>분홍</strong>이면 작업 중입니다.
+          </p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

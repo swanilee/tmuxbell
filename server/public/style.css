@@ -1,0 +1,292 @@
+/* sgtmux: Figma-inspired design tokens (from VoltAgent/awesome-design-md/figma) */
+
+:root {
+  /* colors */
+  --ink: #000000;
+  --canvas: #ffffff;
+  --inverse-canvas: #000000;
+  --inverse-ink: #ffffff;
+  --hairline: #e6e6e6;
+  --hairline-soft: #f1f1f1;
+  --surface-soft: #f7f7f5;
+  --block-lime: #dceeb1;
+  --block-lilac: #c5b0f4;
+  --block-cream: #f4ecd6;
+  --block-pink: #efd4d4;
+  --block-mint: #c8e6cd;
+  --block-coral: #f3c9b6;
+  --block-navy: #1f1d3d;
+  --accent-magenta: #ff3d8b;
+  --semantic-success: #1ea64a;
+
+  /* radius */
+  --r-xs: 2px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 24px;
+  --r-pill: 50px;
+  --r-full: 9999px;
+
+  /* spacing */
+  --s-xxs: 4px;
+  --s-xs: 8px;
+  --s-sm: 12px;
+  --s-md: 16px;
+  --s-lg: 24px;
+  --s-xl: 32px;
+  --s-xxl: 48px;
+
+  /* type */
+  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.45;
+  font-weight: 330;
+  height: 100%;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* ---------- Layout ---------- */
+.app {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: 100vh;
+}
+
+.sidebar {
+  background: var(--canvas);
+  border-right: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  padding: var(--s-lg) var(--s-md);
+  gap: var(--s-md);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+  overflow: hidden;
+}
+
+/* ---------- Brand ---------- */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-xs);
+  padding-bottom: var(--s-md);
+  border-bottom: 1px solid var(--hairline);
+}
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  background: var(--ink);
+  color: var(--inverse-ink);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  font-weight: 540;
+  font-size: 14px;
+}
+.brand-name {
+  font-size: 20px;
+  font-weight: 540;
+  letter-spacing: -0.26px;
+}
+.brand-host {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ink);
+  opacity: 0.55;
+}
+
+/* ---------- Eyebrow (mono uppercase label) ---------- */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ink);
+  opacity: 0.6;
+}
+
+/* ---------- Session list ---------- */
+.session-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xxs);
+  overflow-y: auto;
+  flex: 1;
+}
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+  padding: var(--s-sm) var(--s-md);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background 0.1s;
+  border: 1px solid transparent;
+}
+.session-item:hover { background: var(--surface-soft); }
+.session-item.selected {
+  background: var(--surface-soft);
+  border-color: var(--hairline);
+}
+.session-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--hairline);
+  flex-shrink: 0;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.session-dot.active {
+  background: var(--accent-magenta);
+  box-shadow: 0 0 0 3px rgba(255, 61, 139, 0.18);
+}
+.session-dot.idle {
+  background: var(--semantic-success);
+  box-shadow: 0 0 0 3px rgba(30, 166, 74, 0.18);
+}
+.session-dot.unknown { background: var(--hairline); }
+.session-name {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 330;
+  letter-spacing: -0.14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.session-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+  opacity: 0.5;
+}
+
+/* ---------- Buttons (Figma pill) ---------- */
+.btn-primary {
+  background: var(--ink);
+  color: var(--inverse-ink);
+  border-radius: var(--r-pill);
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: 480;
+  letter-spacing: -0.1px;
+  align-self: stretch;
+  text-align: center;
+}
+.btn-primary:hover { opacity: 0.85; }
+
+.btn-tertiary {
+  color: var(--ink);
+  padding: 8px 12px;
+  font-weight: 480;
+  border-radius: var(--r-full);
+}
+.btn-tertiary:hover { background: var(--surface-soft); }
+
+/* ---------- Topbar ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-md) var(--s-xl);
+  border-bottom: 1px solid var(--hairline);
+  min-height: 56px;
+}
+.topbar-title {
+  font-size: 18px;
+  font-weight: 540;
+  letter-spacing: -0.26px;
+}
+
+/* ---------- Terminal shell ---------- */
+.terminal-shell {
+  flex: 1;
+  padding: var(--s-lg) var(--s-xl);
+  overflow: hidden;
+}
+.terminal-card {
+  background: var(--block-cream);
+  border-radius: var(--r-lg);
+  padding: var(--s-lg);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+#terminal {
+  flex: 1;
+  width: 100%;
+}
+#terminal .xterm-viewport,
+#terminal .xterm-screen {
+  background: transparent !important;
+}
+.xterm {
+  background: transparent !important;
+  padding: var(--s-xs);
+}
+
+/* ---------- Empty state ---------- */
+.empty-state {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: var(--s-xxl);
+}
+.empty-state-card {
+  background: var(--block-lime);
+  border-radius: var(--r-lg);
+  padding: var(--s-xxl);
+  max-width: 480px;
+  text-align: center;
+}
+.empty-state-title {
+  font-size: 26px;
+  font-weight: 540;
+  letter-spacing: -0.26px;
+  margin: 0 0 var(--s-md) 0;
+}
+.empty-state-body {
+  font-size: 18px;
+  font-weight: 320;
+  line-height: 1.45;
+  letter-spacing: -0.26px;
+  margin: 0;
+}
+.empty-state-body code {
+  font-family: var(--font-mono);
+  background: rgba(0,0,0,0.08);
+  padding: 2px 6px;
+  border-radius: var(--r-xs);
+  font-size: 16px;
+}

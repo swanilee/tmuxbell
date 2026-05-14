@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# sgtmux: launch a tmux session and ensure the web dashboard is running.
+#
+# Usage:
+#   sgtmux                       # auto-named session, attach
+#   sgtmux NAME                  # named session, attach (create if missing)
+#   sgtmux NAME -- CMD ARGS...   # named session running CMD instead of $SGTMUX_DEFAULT_CMD
+#   sgtmux --list                # just print sessions and the dashboard URL
+#
+# Env vars:
+#   SGTMUX_DIR          (default: ~/sgtmux)
+#   SGTMUX_PORT         (default: 7681)
+#   SGTMUX_DEFAULT_CMD  (default: "claude")
+
+set -euo pipefail
+
+SGTMUX_DIR="${SGTMUX_DIR:-$HOME/sgtmux}"
+PORT="${SGTMUX_PORT:-7681}"
+DEFAULT_CMD="${SGTMUX_DEFAULT_CMD:-claude}"
+
+# Parse args
+LIST_ONLY=0
+SESSION=""
+CMD=""
+if [[ "${1:-}" == "--list" ]]; then
+  LIST_ONLY=1
+elif [[ -n "${1:-}" ]]; then
+  SESSION="$1"
+  shift || true
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+    CMD="$*"
+  fi
+fi
+if [[ -z "$SESSION" && "$LIST_ONLY" -eq 0 ]]; then
+  SESSION="claude-$(date +%H%M%S)"
+fi
+[[ -z "$CMD" ]] && CMD="$DEFAULT_CMD"
+
+# Start dashboard if not already running
+start_dashboard() {
+  if pgrep -f "node $SGTMUX_DIR/server/server.js" > /dev/null; then
+    return 0
+  fi
+  echo "[sgtmux] starting dashboard at port $PORT..."
+  cd "$SGTMUX_DIR/server"
+  SGTMUX_PORT="$PORT" nohup node server.js > /tmp/sgtmux-server.log 2>&1 &
+  # wait for port to be alive
+  for i in $(seq 1 20); do
+    if curl -sf "http://localhost:$PORT/api/sessions" > /dev/null; then return 0; fi
+    sleep 0.1
+  done
+  echo "[sgtmux] WARNING: dashboard did not respond. Check /tmp/sgtmux-server.log"
+}
+
+start_dashboard
+
+# Print URLs
+HOST="$(hostname)"
+echo "▶ Web:      http://localhost:$PORT  (host: $HOST)"
+if [[ "$LIST_ONLY" -eq 1 ]]; then
+  echo
+  echo "▶ Sessions:"
+  tmux ls 2>/dev/null || echo "  (none)"
+  exit 0
+fi
+echo "▶ Session:  $SESSION    (Ctrl-B D to detach, leaves session running)"
+echo "▶ Cmd:      $CMD"
+echo
+
+# Attach or create the tmux session
+exec tmux new-session -A -s "$SESSION" "$CMD"
