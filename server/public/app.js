@@ -42,62 +42,134 @@ async function fetchSessions() {
 
 function renderSessions(list) {
   state.sessionsById = new Map(list.map(s => [s.name, s]));
-  sessionListEl.innerHTML = '';
+
+  // empty-state placeholder is a special non-data <li>
+  const placeholderClass = 'session-empty-placeholder';
   if (list.length === 0) {
-    const li = document.createElement('li');
-    li.className = 'session-meta';
-    li.style.padding = 'var(--s-sm) var(--s-md)';
-    li.textContent = '(세션 없음)';
-    sessionListEl.appendChild(li);
+    Array.from(sessionListEl.children).forEach(el => {
+      if (!el.classList.contains(placeholderClass)) el.remove();
+    });
+    if (!sessionListEl.querySelector('.' + placeholderClass)) {
+      const li = document.createElement('li');
+      li.className = `session-meta ${placeholderClass}`;
+      li.style.padding = 'var(--s-sm) var(--s-md)';
+      li.textContent = '(세션 없음)';
+      sessionListEl.appendChild(li);
+    }
     return;
   }
+  // remove placeholder if present
+  Array.from(sessionListEl.querySelectorAll('.' + placeholderClass)).forEach(el => el.remove());
+
+  // index existing items by name
+  const existing = new Map();
+  for (const li of Array.from(sessionListEl.children)) {
+    const n = li.dataset.name;
+    if (n) existing.set(n, li);
+  }
+
+  // upsert in the new order
+  const ordered = [];
   for (const s of list) {
-    const li = document.createElement('li');
-    li.className = 'session-item' + (s.name === state.current ? ' selected' : '');
-    li.dataset.name = s.name;
-
-    const dot = document.createElement('div');
-    dot.className = `session-dot ${s.status}`;
-    dot.title = s.status;
-    li.appendChild(dot);
-
-    const name = document.createElement('div');
-    name.className = 'session-name';
-    name.textContent = s.name;
-    li.appendChild(name);
-
-    if (s.status === 'active') {
-      const spin = document.createElement('div');
-      spin.className = 'session-spinner';
-      spin.title = '응답 중';
-      li.appendChild(spin);
-    } else if (s.hasUnseenCompletion) {
-      const check = document.createElement('div');
-      check.className = 'session-check';
-      check.textContent = '✓';
-      check.title = '응답 완료 — 확인 안 함';
-      li.appendChild(check);
-    } else if (s.attached) {
-      const meta = document.createElement('div');
-      meta.className = 'session-meta';
-      meta.textContent = '●';
-      meta.title = 'attached';
-      li.appendChild(meta);
+    let li = existing.get(s.name);
+    if (li) {
+      updateSessionItem(li, s);
+      existing.delete(s.name);
+    } else {
+      li = createSessionItem(s);
     }
+    ordered.push(li);
+  }
 
-    const del = document.createElement('button');
-    del.className = 'session-delete';
-    del.type = 'button';
-    del.textContent = '×';
-    del.title = '세션 종료';
-    del.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      killSession(s.name);
-    });
-    li.appendChild(del);
+  // remove vanished
+  for (const li of existing.values()) li.remove();
 
-    li.addEventListener('click', () => selectSession(s.name));
-    sessionListEl.appendChild(li);
+  // sync child order (move only the ones that drifted)
+  for (let i = 0; i < ordered.length; i++) {
+    if (sessionListEl.children[i] !== ordered[i]) {
+      sessionListEl.insertBefore(ordered[i], sessionListEl.children[i] || null);
+    }
+  }
+}
+
+function createSessionItem(s) {
+  const li = document.createElement('li');
+  li.className = 'session-item';
+  li.dataset.name = s.name;
+
+  const dot = document.createElement('div');
+  dot.className = 'session-dot';
+  li.appendChild(dot);
+
+  const name = document.createElement('div');
+  name.className = 'session-name';
+  name.textContent = s.name;
+  li.appendChild(name);
+
+  // status icon slot (spinner / check / attached-dot / nothing)
+  const icon = document.createElement('div');
+  icon.className = 'session-status-icon';
+  icon.dataset.type = '';
+  li.appendChild(icon);
+
+  const del = document.createElement('button');
+  del.className = 'session-delete';
+  del.type = 'button';
+  del.textContent = '×';
+  del.title = '세션 종료';
+  del.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    killSession(s.name);
+  });
+  li.appendChild(del);
+
+  li.addEventListener('click', () => selectSession(s.name));
+
+  updateSessionItem(li, s);
+  return li;
+}
+
+function updateSessionItem(li, s) {
+  // selection
+  const selected = (s.name === state.current);
+  if (li.classList.contains('selected') !== selected) {
+    li.classList.toggle('selected', selected);
+  }
+
+  // status dot class
+  const dot = li.firstElementChild; // .session-dot
+  const wantDotClass = `session-dot ${s.status}`;
+  if (dot && dot.className !== wantDotClass) dot.className = wantDotClass;
+  if (dot && dot.title !== s.status) dot.title = s.status;
+
+  // status icon slot — only swap contents when the type changes
+  const icon = li.querySelector('.session-status-icon');
+  let wantType = 'none';
+  if (s.status === 'active') wantType = 'spinner';
+  else if (s.hasUnseenCompletion) wantType = 'check';
+  else if (s.attached) wantType = 'attached';
+
+  if (icon && icon.dataset.type !== wantType) {
+    icon.dataset.type = wantType;
+    icon.innerHTML = '';
+    if (wantType === 'spinner') {
+      const d = document.createElement('div');
+      d.className = 'session-spinner';
+      d.title = '응답 중';
+      icon.appendChild(d);
+    } else if (wantType === 'check') {
+      const d = document.createElement('div');
+      d.className = 'session-check';
+      d.textContent = '✓';
+      d.title = '응답 완료 — 확인 안 함';
+      icon.appendChild(d);
+    } else if (wantType === 'attached') {
+      const d = document.createElement('div');
+      d.className = 'session-meta';
+      d.textContent = '●';
+      d.title = 'attached';
+      icon.appendChild(d);
+    }
   }
 }
 
