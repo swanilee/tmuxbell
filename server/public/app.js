@@ -12,13 +12,18 @@
 //   - unknown (gray)    : no pty ever attached (or just-created session)
 
 const POLL_MS = 1000;
+const WINDOWS_POLL_MS = 1500;
 
+// state.current        : selected session name
+// state.panels         : Map<windowIdx, { container, term, fitAddon, ws }>
+// state.sessionsById   : last-fetched session metadata
+// state.windowsKey     : "indices in current grid"   to detect changes
 let state = {
-  current: null,        // selected session name
-  term: null,           // xterm instance
-  fitAddon: null,
-  ws: null,
+  current: null,
+  panels: new Map(),
   sessionsById: new Map(),
+  windowsKey: '',
+  windowsTimer: null,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -27,7 +32,15 @@ const hostEl = $('#host');
 const currentEl = $('#currentSession');
 const killBtn = $('#killBtn');
 const newBtn = $('#newSessionBtn');
+const newWindowBtn = $('#newWindowBtn');
 const mainContentEl = $('#mainContent');
+
+// Modal
+const modal = $('#newWindowModal');
+const modalName = $('#newWindowName');
+const modalFork = $('#newWindowFork');
+const modalCmd = $('#newWindowCmd');
+const modalCreate = $('#newWindowCreate');
 
 async function fetchSessions() {
   try {
@@ -183,16 +196,10 @@ async function killSession(name) {
       state.current = null;
       currentEl.textContent = '세션을 선택하세요';
       killBtn.hidden = true;
-      if (state.ws) { try { state.ws.close(); } catch (_) {} state.ws = null; }
-      if (state.term) { try { state.term.dispose(); } catch (_) {} state.term = null; }
-      mainContentEl.className = 'empty-state';
-      mainContentEl.innerHTML = `
-        <div class="empty-state-card">
-          <h2 class="empty-state-title">왼쪽에서 세션을 선택하거나 새로 만드세요</h2>
-          <p class="empty-state-body">
-            터미널에서 <code>sgtmux</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.
-          </p>
-        </div>`;
+      newWindowBtn.hidden = true;
+      closeAllPanels();
+      state.windowsKey = '';
+      showEmptyState();
     }
     await fetchSessions();
   } catch (e) {
@@ -200,15 +207,146 @@ async function killSession(name) {
   }
 }
 
-function ensureTerminalView() {
-  if (mainContentEl.classList.contains('empty-state')) {
-    mainContentEl.classList.remove('empty-state');
-    mainContentEl.className = 'terminal-shell';
-    mainContentEl.innerHTML = `
-      <div class="terminal-card">
-        <div id="terminal"></div>
-      </div>
-    `;
+function ensureGridView() {
+  if (mainContentEl.classList.contains('empty-state') || !mainContentEl.classList.contains('windows-grid')) {
+    mainContentEl.className = 'windows-grid';
+    mainContentEl.innerHTML = '';
+  }
+}
+
+function showEmptyState() {
+  mainContentEl.className = 'empty-state';
+  mainContentEl.innerHTML = `
+    <div class="empty-state-card">
+      <h2 class="empty-state-title">왼쪽에서 세션을 선택하거나 새로 만드세요</h2>
+      <p class="empty-state-body">
+        터미널에서 <code>sgtmux</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.
+      </p>
+    </div>`;
+}
+
+function closeAllPanels() {
+  for (const [, p] of state.panels) closePanel(p);
+  state.panels.clear();
+}
+
+function closePanel(p) {
+  if (p.ws) { try { p.ws.close(); } catch (_) {} }
+  if (p.term) { try { p.term.dispose(); } catch (_) {} }
+  if (p.container && p.container.parentNode) p.container.parentNode.removeChild(p.container);
+}
+
+function createPanel(sessionName, w) {
+  const container = document.createElement('div');
+  container.className = 'window-panel';
+  container.dataset.window = String(w.index);
+
+  const header = document.createElement('div');
+  header.className = 'window-header';
+  const idx = document.createElement('div');
+  idx.className = 'window-idx';
+  idx.textContent = `#${w.index}`;
+  const title = document.createElement('div');
+  title.className = 'window-title';
+  title.textContent = w.name || `window-${w.index}`;
+  const kill = document.createElement('button');
+  kill.className = 'window-kill';
+  kill.type = 'button';
+  kill.textContent = '×';
+  kill.title = '윈도우 종료';
+  kill.addEventListener('click', () => killWindow(sessionName, w.index));
+  header.appendChild(idx);
+  header.appendChild(title);
+  header.appendChild(kill);
+  container.appendChild(header);
+
+  const termEl = document.createElement('div');
+  termEl.className = 'window-terminal';
+  container.appendChild(termEl);
+
+  const term = new Terminal({
+    fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+    fontSize: 13,
+    theme: {
+      background: '#15161a',
+      foreground: '#f0f0f3',
+      cursor: '#f0f0f3',
+      selectionBackground: 'rgba(240, 240, 243, 0.18)',
+    },
+    cursorBlink: true,
+    scrollback: 10000,
+  });
+  const fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+
+  mainContentEl.appendChild(container);
+  term.open(termEl);
+  fitAddon.fit();
+
+  const { cols, rows } = term;
+  const wsUrl = `ws://${location.host}/ws?session=${encodeURIComponent(sessionName)}&window=${w.index}&cols=${cols}&rows=${rows}`;
+  const ws = new WebSocket(wsUrl);
+  ws.binaryType = 'arraybuffer';
+  ws.onmessage = (ev) => {
+    if (typeof ev.data === 'string') term.write(ev.data);
+    else term.write(new Uint8Array(ev.data));
+  };
+  ws.onclose = () => term.writeln('\r\n\x1b[2m[sgtmux] disconnected.\x1b[0m');
+  term.onData((d) => { if (ws.readyState === 1) ws.send(d); });
+
+  return { container, term, fitAddon, ws, windowIndex: w.index };
+}
+
+async function refreshWindows() {
+  if (!state.current) return;
+  let windows = [];
+  try {
+    const r = await fetch(`/api/sessions/${encodeURIComponent(state.current)}/windows`);
+    const j = await r.json();
+    windows = (j.windows || []).sort((a, b) => a.index - b.index);
+  } catch (e) {
+    return;
+  }
+
+  const newKey = windows.map(w => `${w.index}:${w.name}`).join('|');
+  if (newKey === state.windowsKey) return;
+  state.windowsKey = newKey;
+
+  ensureGridView();
+
+  const present = new Set(windows.map(w => w.index));
+  // close panels for windows that disappeared
+  for (const [idx, p] of state.panels) {
+    if (!present.has(idx)) {
+      closePanel(p);
+      state.panels.delete(idx);
+    }
+  }
+  // open panels for new windows; update title for existing
+  for (const w of windows) {
+    if (!state.panels.has(w.index)) {
+      state.panels.set(w.index, createPanel(state.current, w));
+    } else {
+      const p = state.panels.get(w.index);
+      const titleEl = p.container.querySelector('.window-title');
+      if (titleEl && titleEl.textContent !== (w.name || `window-${w.index}`)) {
+        titleEl.textContent = w.name || `window-${w.index}`;
+      }
+    }
+  }
+
+  // if zero windows somehow → empty state
+  if (state.panels.size === 0) showEmptyState();
+}
+
+async function killWindow(sessionName, idx) {
+  if (!confirm(`window #${idx}를 종료할까요?`)) return;
+  try {
+    await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/windows/${idx}/kill`, { method: 'POST' });
+    state.windowsKey = '';
+    refreshWindows();
+  } catch (e) {
+    alert('윈도우 종료 실패: ' + e.message);
   }
 }
 
@@ -217,59 +355,36 @@ function selectSession(name) {
   state.current = name;
   currentEl.textContent = name;
   killBtn.hidden = false;
+  newWindowBtn.hidden = false;
 
-  // close existing
-  if (state.ws) { try { state.ws.close(); } catch (_) {} state.ws = null; }
-  if (state.term) { try { state.term.dispose(); } catch (_) {} state.term = null; }
+  closeAllPanels();
+  state.windowsKey = '';
+  ensureGridView();
+  refreshWindows();
 
-  ensureTerminalView();
-
-  // create xterm
-  state.term = new Terminal({
-    fontFamily: 'JetBrains Mono, ui-monospace, monospace',
-    fontSize: 13,
-    theme: {
-      background: '#15161a',   // surface-recessed (matches CSS)
-      foreground: '#f0f0f3',   // ink (off-white)
-      cursor: '#f0f0f3',
-      selectionBackground: 'rgba(240, 240, 243, 0.18)',
-    },
-    cursorBlink: true,
-    scrollback: 10000,
-  });
-  state.fitAddon = new FitAddon.FitAddon();
-  state.term.loadAddon(state.fitAddon);
-  state.term.open(document.getElementById('terminal'));
-  state.fitAddon.fit();
-
-  // connect WS
-  const { cols, rows } = state.term;
-  const wsUrl = `ws://${location.host}/ws?session=${encodeURIComponent(name)}&cols=${cols}&rows=${rows}`;
-  state.ws = new WebSocket(wsUrl);
-  state.ws.binaryType = 'arraybuffer';
-
-  state.ws.onmessage = (ev) => {
-    if (typeof ev.data === 'string') state.term.write(ev.data);
-    else state.term.write(new Uint8Array(ev.data));
-  };
-  state.ws.onclose = () => { state.term.writeln('\r\n\x1b[2m[sgtmux] connection closed.\x1b[0m'); };
-
-  state.term.onData((d) => {
-    if (state.ws && state.ws.readyState === 1) state.ws.send(d);
-  });
-
-  // refresh styles
+  // refresh sidebar styles
   document.querySelectorAll('.session-item').forEach(el => {
     el.classList.toggle('selected', el.dataset.name === name);
   });
 }
 
+// Auto-poll windows of the currently selected session.
+function startWindowsPolling() {
+  if (state.windowsTimer) clearInterval(state.windowsTimer);
+  state.windowsTimer = setInterval(() => {
+    if (state.current) refreshWindows();
+  }, WINDOWS_POLL_MS);
+}
+
 window.addEventListener('resize', () => {
-  if (!state.fitAddon || !state.term || !state.ws) return;
-  state.fitAddon.fit();
-  const { cols, rows } = state.term;
-  if (state.ws.readyState === 1) {
-    state.ws.send(JSON.stringify({ resize: [cols, rows] }));
+  for (const [, p] of state.panels) {
+    try {
+      p.fitAddon.fit();
+      const { cols, rows } = p.term;
+      if (p.ws && p.ws.readyState === 1) {
+        p.ws.send(JSON.stringify({ resize: [cols, rows] }));
+      }
+    } catch (_) {}
   }
 });
 
@@ -295,6 +410,59 @@ newBtn.addEventListener('click', async () => {
 killBtn.addEventListener('click', () => {
   if (state.current) killSession(state.current);
 });
+
+// ── New-window modal ────────────────────────────────────────────────
+function openNewWindowModal() {
+  modalName.value = '';
+  modalCmd.value = '';
+  modalFork.checked = true;
+  modal.hidden = false;
+  setTimeout(() => modalName.focus(), 0);
+}
+function closeNewWindowModal() { modal.hidden = true; }
+
+newWindowBtn.addEventListener('click', () => {
+  if (!state.current) return;
+  openNewWindowModal();
+});
+modal.addEventListener('click', (ev) => {
+  if (ev.target.dataset.modalClose !== undefined || ev.target === modal.querySelector('.modal-backdrop')) {
+    closeNewWindowModal();
+  }
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && !modal.hidden) closeNewWindowModal();
+});
+
+modalCreate.addEventListener('click', async () => {
+  if (!state.current) return;
+  const name = modalName.value.trim() || undefined;
+  const cmd = modalCmd.value.trim() || undefined;
+  const fork = !!modalFork.checked;
+  if (name && !/^[A-Za-z0-9_-]+$/.test(name)) {
+    alert('윈도우 이름은 영숫자/하이픈/언더스코어만.');
+    return;
+  }
+  modalCreate.disabled = true;
+  try {
+    const r = await fetch(`/api/sessions/${encodeURIComponent(state.current)}/windows`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, cmd, fork }),
+    });
+    const j = await r.json();
+    if (!j.ok) { alert('생성 실패: ' + (j.error || 'unknown')); return; }
+    closeNewWindowModal();
+    state.windowsKey = '';
+    refreshWindows();
+  } catch (e) {
+    alert('요청 실패: ' + e.message);
+  } finally {
+    modalCreate.disabled = false;
+  }
+});
+
+startWindowsPolling();
 
 // boot
 fetchSessions();
