@@ -71,6 +71,12 @@ function renderSessions(list) {
       spin.className = 'session-spinner';
       spin.title = '응답 중';
       li.appendChild(spin);
+    } else if (s.hasUnseenCompletion) {
+      const check = document.createElement('div');
+      check.className = 'session-check';
+      check.textContent = '✓';
+      check.title = '응답 완료 — 확인 안 함';
+      li.appendChild(check);
     } else if (s.attached) {
       const meta = document.createElement('div');
       meta.className = 'session-meta';

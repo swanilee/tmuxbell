@@ -43,6 +43,10 @@ function trackSession(name) {
       burstActive: false,
       burstQuietTimer: null,
       burstMaxTimer: null,
+      // completion-acknowledgement tracking
+      prevStatus: 'unknown',
+      completedAt: 0,        // last active → idle transition
+      acknowledgedAt: 0,     // last WS connect or explicit ack
     });
   }
   return sessions.get(name);
@@ -141,6 +145,15 @@ function tmuxList() {
     if (lastOutputMs > 0) {
       status = idleMs > IDLE_THRESHOLD_MS ? 'idle' : 'active';
     }
+    // Detect active → idle transition = "Claude just finished responding"
+    if (state && state.prevStatus === 'active' && status === 'idle') {
+      state.completedAt = now;
+      // Auto-ack if someone is currently viewing this session via WS
+      if (state.ptys.size > 0) state.acknowledgedAt = now;
+    }
+    if (state) state.prevStatus = status;
+    const hasUnseenCompletion =
+      state && state.completedAt > state.acknowledgedAt;
     return {
       name,
       created: parseInt(created, 10) * 1000,
@@ -149,6 +162,7 @@ function tmuxList() {
       lastOutputMs,
       idleMs,
       status,
+      hasUnseenCompletion: !!hasUnseenCompletion,
     };
   });
   cleanupMonitors(names);
@@ -220,6 +234,8 @@ wss.on('connection', (ws, req) => {
 
   const state = trackSession(name);
   state.ptys.add(term);
+  // Viewing the session counts as acknowledging any pending completion notif.
+  state.acknowledgedAt = Date.now();
   // The background monitor pty is the source of truth for activity.
   // This WS pty only forwards bytes to the client.
   ensureMonitor(name);
