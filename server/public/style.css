@@ -346,6 +346,30 @@ button {
 }
 .btn-tertiary:hover { background: var(--surface-soft); }
 
+/* ---------- Language switcher (sidebar bottom) ---------- */
+.lang-switcher {
+  display: flex;
+  gap: 4px;
+  padding-top: var(--s-sm);
+  border-top: 1px solid var(--hairline-soft);
+}
+.lang-btn {
+  flex: 1;
+  padding: 6px 0;
+  border-radius: var(--r-md);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  opacity: 0.55;
+  transition: background 0.1s, opacity 0.1s, color 0.1s;
+}
+.lang-btn:hover { background: var(--surface-soft); opacity: 0.9; }
+.lang-btn.active {
+  background: var(--ink);
+  color: var(--inverse-ink);
+  opacity: 1;
+}
+
 /* ---------- Topbar ---------- */
 .topbar {
   display: flex;

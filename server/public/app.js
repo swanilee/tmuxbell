@@ -69,7 +69,7 @@ function renderSessions(list) {
       const li = document.createElement('li');
       li.className = `session-meta ${placeholderClass}`;
       li.style.padding = 'var(--s-sm) var(--s-md)';
-      li.textContent = '(세션 없음)';
+      li.textContent = tmuxbellI18n.t('sidebar.none');
       sessionListEl.appendChild(li);
     }
     return;
@@ -125,7 +125,7 @@ function createSessionItem(s) {
   const name = document.createElement('div');
   name.className = 'session-name';
   name.textContent = s.name;
-  name.title = '더블클릭해서 이름 변경';
+  name.title = tmuxbellI18n.t('tip.dblclick_rename');
   name.addEventListener('dblclick', (ev) => {
     ev.stopPropagation();
     const current = s.name;
@@ -147,7 +147,7 @@ function createSessionItem(s) {
   del.className = 'session-delete';
   del.type = 'button';
   del.textContent = '×';
-  del.title = '세션 종료';
+  del.title = tmuxbellI18n.t('tip.kill_session');
   del.addEventListener('click', (ev) => {
     ev.stopPropagation();
     killSession(s.name);
@@ -197,13 +197,13 @@ function updateSessionItem(li, s) {
     if (wantType === 'spinner') {
       const d = document.createElement('div');
       d.className = 'session-spinner';
-      d.title = '응답 중';
+      d.title = tmuxbellI18n.t('tip.responding');
       icon.appendChild(d);
     } else if (wantType === 'check') {
       const d = document.createElement('div');
       d.className = 'session-check';
       d.textContent = '✓';
-      d.title = '응답 완료 — 확인 안 함';
+      d.title = tmuxbellI18n.t('tip.completed_unseen');
       icon.appendChild(d);
     }
   }
@@ -230,7 +230,7 @@ function updateWindowSublist(ul, sessionName, windows) {
       const nameEl = document.createElement('span');
       nameEl.className = 'window-row-name';
       nameEl.textContent = w.name || `window-${w.index}`;
-      nameEl.title = '더블클릭해서 이름 변경';
+      nameEl.title = tmuxbellI18n.t('tip.dblclick_rename');
       const wIdx = w.index;
       nameEl.addEventListener('dblclick', (ev) => {
         ev.stopPropagation();
@@ -324,7 +324,7 @@ function makeEditable(el, originalValue, onCommit) {
 }
 
 async function renameSession(oldName, newName) {
-  if (!/^[A-Za-z0-9_-]+$/.test(newName)) { alert('이름은 영숫자/하이픈/언더스코어만.'); return; }
+  if (!/^[A-Za-z0-9_-]+$/.test(newName)) { alert(tmuxbellI18n.t('alert.invalid_name')); return; }
   try {
     const r = await fetch(`/api/sessions/${encodeURIComponent(oldName)}/rename`, {
       method: 'POST',
@@ -332,16 +332,16 @@ async function renameSession(oldName, newName) {
       body: JSON.stringify({ to: newName }),
     });
     const j = await r.json();
-    if (!j.ok) { alert('이름 변경 실패: ' + (j.error || 'unknown')); return; }
+    if (!j.ok) { alert(tmuxbellI18n.t('alert.rename_failed', {error: j.error || 'unknown'})); return; }
     if (state.current === oldName) state.current = newName;
     await fetchSessions();
   } catch (e) {
-    alert('요청 실패: ' + e.message);
+    alert(tmuxbellI18n.t('alert.request_failed', {error: e.message}));
   }
 }
 
 async function renameWindow(sessionName, idx, newName) {
-  if (!/^[A-Za-z0-9_-]+$/.test(newName)) { alert('이름은 영숫자/하이픈/언더스코어만.'); return; }
+  if (!/^[A-Za-z0-9_-]+$/.test(newName)) { alert(tmuxbellI18n.t('alert.invalid_name')); return; }
   try {
     const r = await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/windows/${idx}/rename`, {
       method: 'POST',
@@ -349,23 +349,23 @@ async function renameWindow(sessionName, idx, newName) {
       body: JSON.stringify({ to: newName }),
     });
     const j = await r.json();
-    if (!j.ok) { alert('이름 변경 실패: ' + (j.error || 'unknown')); return; }
+    if (!j.ok) { alert(tmuxbellI18n.t('alert.rename_failed', {error: j.error || 'unknown'})); return; }
     await fetchSessions();
     if (state.current === sessionName) refreshWindows();
   } catch (e) {
-    alert('요청 실패: ' + e.message);
+    alert(tmuxbellI18n.t('alert.request_failed', {error: e.message}));
   }
 }
 
 async function killSession(name) {
-  if (!confirm(`세션 "${name}"를 종료할까요?`)) return;
+  if (!confirm(tmuxbellI18n.t('confirm.kill_session', {name}))) return;
   try {
     const r = await fetch(`/api/sessions/${encodeURIComponent(name)}/kill`, { method: 'POST' });
     const j = await r.json();
-    if (!j.ok) { alert('종료 실패: ' + (j.error || 'unknown')); return; }
+    if (!j.ok) { alert(tmuxbellI18n.t('alert.kill_failed', {error: j.error || 'unknown'})); return; }
     if (state.current === name) {
       state.current = null;
-      currentEl.textContent = '세션을 선택하세요';
+      currentEl.textContent = tmuxbellI18n.t('topbar.placeholder');
       killBtn.hidden = true;
       newWindowBtn.hidden = true;
       closePanel();
@@ -375,7 +375,7 @@ async function killSession(name) {
     }
     await fetchSessions();
   } catch (e) {
-    alert('요청 실패: ' + e.message);
+    alert(tmuxbellI18n.t('alert.request_failed', {error: e.message}));
   }
 }
 
@@ -393,12 +393,10 @@ function showEmptyState() {
   mainContentEl.className = 'empty-state';
   mainContentEl.innerHTML = `
     <div class="empty-state-card">
-      <h2 class="empty-state-title">왼쪽에서 세션을 선택하거나 새로 만드세요</h2>
-      <p class="empty-state-body">
-        터미널에서 <code>tmuxbell</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.<br />
-        세션 점이 <strong>녹색</strong>이면 응답 대기 중, <strong>분홍</strong>이면 작업 중입니다.
-      </p>
+      <h2 class="empty-state-title" data-i18n="empty.title"></h2>
+      <p class="empty-state-body" data-i18n="empty.body"></p>
     </div>`;
+  tmuxbellI18n.applyI18n();
 }
 
 function closePanel() {
@@ -438,7 +436,7 @@ function openPanel(sessionName) {
     if (typeof ev.data === 'string') term.write(ev.data);
     else term.write(new Uint8Array(ev.data));
   };
-  ws.onclose = () => term.writeln('\r\n\x1b[2m[tmuxbell] disconnected.\x1b[0m');
+  ws.onclose = () => term.writeln('\r\n\x1b[2m' + tmuxbellI18n.t('term.disconnected') + '\x1b[0m');
   term.onData((d) => { if (ws.readyState === 1) ws.send(d); });
 
   state.panel = { term, fitAddon, ws };
@@ -470,7 +468,7 @@ function renderWindowTabs() {
       kill.className = 'window-tab-kill';
       kill.type = 'button';
       kill.textContent = '×';
-      kill.title = '윈도우 종료';
+      kill.title = tmuxbellI18n.t('tip.kill_window');
       kill.addEventListener('click', (ev) => {
         ev.stopPropagation();
         killWindow(state.current, w.index);
@@ -533,17 +531,17 @@ async function selectWindow(idx) {
     renderWindowTabs();
     refreshWindows();
   } catch (e) {
-    alert('윈도우 전환 실패: ' + e.message);
+    alert(tmuxbellI18n.t('alert.window_select_failed', {error: e.message}));
   }
 }
 
 async function killWindow(sessionName, idx) {
-  if (!confirm(`window #${idx}를 종료할까요?`)) return;
+  if (!confirm(tmuxbellI18n.t('confirm.kill_window', {idx}))) return;
   try {
     await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/windows/${idx}/kill`, { method: 'POST' });
     refreshWindows();
   } catch (e) {
-    alert('윈도우 종료 실패: ' + e.message);
+    alert(tmuxbellI18n.t('alert.window_kill_failed', {error: e.message}));
   }
 }
 
@@ -586,20 +584,20 @@ window.addEventListener('resize', () => {
 
 newBtn.addEventListener('click', async () => {
   const stamp = new Date().toISOString().slice(11, 19).replace(/:/g, '');
-  const name = prompt('새 세션 이름:', `claude-${stamp}`);
+  const name = prompt(tmuxbellI18n.t('prompt.new_session_name'), `claude-${stamp}`);
   if (!name) return;
   if (!/^[A-Za-z0-9_-]+$/.test(name)) {
-    alert('세션 이름은 영숫자/하이픈/언더스코어만 허용됩니다.');
+    alert(tmuxbellI18n.t('alert.invalid_name'));
     return;
   }
   try {
     const r = await fetch(`/api/sessions/${encodeURIComponent(name)}/new`, { method: 'POST' });
     const j = await r.json();
-    if (!j.ok) { alert('생성 실패: ' + (j.error || 'unknown')); return; }
+    if (!j.ok) { alert(tmuxbellI18n.t('alert.create_failed', {error: j.error || 'unknown'})); return; }
     await fetchSessions();
     selectSession(name);
   } catch (e) {
-    alert('요청 실패: ' + e.message);
+    alert(tmuxbellI18n.t('alert.request_failed', {error: e.message}));
   }
 });
 
@@ -636,7 +634,7 @@ modalCreate.addEventListener('click', async () => {
   const cmd = modalCmd.value.trim() || undefined;
   const fork = !!modalFork.checked;
   if (name && !/^[A-Za-z0-9_-]+$/.test(name)) {
-    alert('윈도우 이름은 영숫자/하이픈/언더스코어만.');
+    alert(tmuxbellI18n.t('alert.invalid_name'));
     return;
   }
   modalCreate.disabled = true;
@@ -647,13 +645,13 @@ modalCreate.addEventListener('click', async () => {
       body: JSON.stringify({ name, cmd, fork }),
     });
     const j = await r.json();
-    if (!j.ok) { alert('생성 실패: ' + (j.error || 'unknown')); return; }
+    if (!j.ok) { alert(tmuxbellI18n.t('alert.create_failed', {error: j.error || 'unknown'})); return; }
     closeNewWindowModal();
     await refreshWindows();
     // tmux may need a tick to register; refresh once more shortly after
     setTimeout(refreshWindows, 300);
   } catch (e) {
-    alert('요청 실패: ' + e.message);
+    alert(tmuxbellI18n.t('alert.request_failed', {error: e.message}));
   } finally {
     modalCreate.disabled = false;
   }
@@ -661,6 +659,31 @@ modalCreate.addEventListener('click', async () => {
 
 startWindowsPolling();
 
+// ── Language switcher ───────────────────────────────────────────────
+const langSwitcher = document.getElementById('langSwitcher');
+if (langSwitcher) {
+  langSwitcher.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.lang-btn');
+    if (!btn) return;
+    tmuxbellI18n.setLang(btn.dataset.lang);
+  });
+}
+
+window.addEventListener('tmuxbell:lang-changed', () => {
+  // Strings inside dynamic DOM nodes (session/window names tooltips, dot
+  // titles, empty-state) are written at create-time, so force a rebuild.
+  sessionListEl.innerHTML = '';
+  state.sessionsById = new Map();
+  fetchSessions();
+  if (state.current) {
+    refreshWindows();
+  } else {
+    // refresh empty-state HTML which is dynamically generated
+    showEmptyState();
+  }
+});
+
 // boot
+tmuxbellI18n.applyI18n();
 fetchSessions();
 setInterval(fetchSessions, POLL_MS);

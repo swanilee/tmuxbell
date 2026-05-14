@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -20,24 +20,28 @@
         <div class="brand-name">tmuxbell</div>
         <div class="brand-host" id="host">—</div>
       </header>
-      <div class="eyebrow">SESSIONS</div>
+      <div class="eyebrow" data-i18n="sidebar.sessions">SESSIONS</div>
       <ul class="session-list" id="sessionList"></ul>
-      <button class="btn-primary" id="newSessionBtn">+ 새 세션</button>
+      <button class="btn-primary" id="newSessionBtn" data-i18n="sidebar.new">+ New session</button>
+      <div class="lang-switcher" id="langSwitcher">
+        <button class="lang-btn" type="button" data-lang="en">EN</button>
+        <button class="lang-btn" type="button" data-lang="ko">한</button>
+        <button class="lang-btn" type="button" data-lang="zh">中</button>
+      </div>
     </aside>
     <main class="main">
       <header class="topbar">
-        <div class="topbar-title" id="currentSession">세션을 선택하세요</div>
+        <div class="topbar-title" id="currentSession" data-i18n="topbar.placeholder">Select a session</div>
         <div class="topbar-actions">
-          <button class="btn-tertiary" id="newWindowBtn" hidden>+ 새 윈도우</button>
-          <button class="btn-tertiary" id="killBtn" hidden>세션 종료</button>
+          <button class="btn-tertiary" id="newWindowBtn" hidden data-i18n="topbar.new_window">+ New window</button>
+          <button class="btn-tertiary" id="killBtn" hidden data-i18n="topbar.kill_session">Kill session</button>
         </div>
       </header>
       <div id="mainContent" class="empty-state">
         <div class="empty-state-card">
-          <h2 class="empty-state-title">왼쪽에서 세션을 선택하거나 새로 만드세요</h2>
-          <p class="empty-state-body">
-            터미널에서 <code>tmuxbell</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.<br />
-            세션 점이 <strong>녹색</strong>이면 응답 대기 중, <strong>분홍</strong>이면 작업 중입니다.
+          <h2 class="empty-state-title" data-i18n="empty.title">Pick a session on the left or create a new one</h2>
+          <p class="empty-state-body" data-i18n="empty.body">
+            Run <code>tmuxbell</code> in a terminal to start a new tmux session.
           </p>
         </div>
       </div>
@@ -48,29 +52,30 @@
   <div id="newWindowModal" class="modal" hidden>
     <div class="modal-backdrop" data-modal-close></div>
     <div class="modal-card">
-      <div class="eyebrow">새 윈도우 추가</div>
+      <div class="eyebrow" data-i18n="modal.title">New window</div>
       <label class="field">
-        <span class="field-label">윈도우 이름 (선택)</span>
-        <input type="text" id="newWindowName" placeholder="예: tests" class="text-input" />
+        <span class="field-label" data-i18n="modal.name_label">Window name (optional)</span>
+        <input type="text" id="newWindowName" data-i18n-placeholder="modal.name_placeholder" class="text-input" />
       </label>
       <label class="field-checkbox">
         <input type="checkbox" id="newWindowFork" checked />
-        <span>현재 윈도우의 작업 디렉토리(CWD) 이어받기</span>
+        <span data-i18n="modal.fork_cwd">Inherit current working directory (CWD)</span>
       </label>
       <label class="field">
-        <span class="field-label">새 윈도우에서 실행할 명령 (선택)</span>
-        <input type="text" id="newWindowCmd" placeholder="비워두면 claude. 예: bash, htop, vim foo.py" class="text-input" />
-        <span class="field-help">새 윈도우가 열리면 이 명령이 자동 실행됩니다. 그냥 셸이 필요하면 <code>bash</code>.</span>
+        <span class="field-label" data-i18n="modal.cmd_label">Command to run in the new window (optional)</span>
+        <input type="text" id="newWindowCmd" data-i18n-placeholder="modal.cmd_placeholder" class="text-input" />
+        <span class="field-help" data-i18n="modal.cmd_help">This command auto-runs when the window opens.</span>
       </label>
       <div class="modal-actions">
-        <button class="btn-tertiary" data-modal-close>취소</button>
-        <button class="btn-primary" id="newWindowCreate">생성</button>
+        <button class="btn-tertiary" data-modal-close data-i18n="modal.cancel">Cancel</button>
+        <button class="btn-primary" id="newWindowCreate" data-i18n="modal.create">Create</button>
       </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+  <script src="/i18n.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
