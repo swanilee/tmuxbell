@@ -1,20 +1,24 @@
 // sgtmux dashboard server.
 //
-// - GET  /api/sessions                          → list tmux sessions + activity
-// - POST /api/sessions/:name/new                → create a new session
-// - POST /api/sessions/:name/kill               → kill a session
-// - GET  /api/sessions/:name/windows            → list windows of a session
-// - POST /api/sessions/:name/windows            → create a window in a session
-//                                                 body: { fork?: bool, name?, cmd? }
-// - POST /api/sessions/:name/windows/:idx/kill  → kill a single window
-// - WS   /ws?session=NAME&window=IDX            → pty stream pinned to that window
+// - GET  /api/sessions                            → list tmux sessions + activity
+// - POST /api/sessions/:name/new                  → create a new session
+// - POST /api/sessions/:name/kill                 → kill a session
+// - GET  /api/sessions/:name/windows              → list windows of a session
+// - POST /api/sessions/:name/windows              → add a window
+//                                                   body: { fork?, name?, cmd? }
+// - POST /api/sessions/:name/windows/:idx/kill    → kill a single window
+// - POST /api/sessions/:name/windows/:idx/select  → switch the session's active
+//                                                   window (so attached clients
+//                                                   redraw to that window)
+// - WS   /ws?session=NAME                         → pty stream attached to NAME's
+//                                                   current active window
 //
-// Multi-window viewing:
-//   - Each (parent session, window idx) pair gets a "linked view session" via
-//     `tmux new-session -t parent -s _sgview_<parent>_<idx>`. Linked sessions
-//     share windows with parent but maintain an independent active-window
-//     pointer, so multiple WS clients can show different windows side by side.
-//     The `_sgview_...` sessions are hidden from /api/sessions.
+// Window UI model is a *tab strip* per session: there is exactly one attach
+// per selected session and clicking a tab calls /select to switch the
+// underlying tmux active window. (Earlier multi-panel attempts using tmux
+// session groups proved unreliable: tmux 3.2a syncs current window across
+// linked sessions when a second client attaches, so per-panel isolation was
+// impossible.)
 
 const express = require('express');
 const http = require('http');
@@ -122,11 +126,6 @@ function cleanupMonitors(currentNames) {
   }
 }
 
-// ── Multi-window viewing helpers ──────────────────────────────────────────
-function viewSessionName(parent, windowIdx) {
-  return `${VIEW_PREFIX}${parent}__${windowIdx}`;
-}
-
 function sessionExists(name) {
   try {
     execSync(`${TMUX} has-session -t ${JSON.stringify(name)}`, { stdio: 'ignore' });
@@ -134,23 +133,6 @@ function sessionExists(name) {
   } catch (_) {
     return false;
   }
-}
-
-function ensureViewSession(parent, windowIdx) {
-  const view = viewSessionName(parent, windowIdx);
-  if (!sessionExists(view)) {
-    // -t parent links into parent's session group, sharing all windows
-    execSync(`${TMUX} new-session -d -t ${JSON.stringify(parent)} -s ${JSON.stringify(view)}`, { stdio: 'ignore' });
-    // keep alive even when no clients
-    try {
-      execSync(`${TMUX} set-option -t ${JSON.stringify(view)} destroy-unattached off`, { stdio: 'ignore' });
-    } catch (_) {}
-  }
-  // pin the view's active window to the requested idx (per-client state)
-  try {
-    execSync(`${TMUX} select-window -t ${JSON.stringify(view + ':' + windowIdx)}`, { stdio: 'ignore' });
-  } catch (_) {}
-  return view;
 }
 
 function listWindows(name) {
@@ -177,6 +159,22 @@ function listWindows(name) {
 function isValidName(s) {
   return typeof s === 'string' && /^[A-Za-z0-9_-]+$/.test(s);
 }
+
+// On server start, clean up any leftover view sessions from older versions.
+function cleanupLegacyViewSessions() {
+  try {
+    const out = execSync(`${TMUX} list-sessions -F '#{session_name}'`, {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (!out) return;
+    for (const n of out.split('\n')) {
+      if (n.startsWith(VIEW_PREFIX)) {
+        try { execSync(`${TMUX} kill-session -t ${JSON.stringify(n)}`, { stdio: 'ignore' }); } catch (_) {}
+      }
+    }
+  } catch (_) {}
+}
+cleanupLegacyViewSessions();
 
 function tmuxList() {
   let out;
@@ -269,15 +267,6 @@ app.post('/api/sessions/:name/kill', (req, res) => {
     return res.status(400).json({ ok: false, error: 'invalid session name' });
   }
   try {
-    // Also kill any linked view sessions for this parent
-    try {
-      const all = execSync(`${TMUX} list-sessions -F '#{session_name}'`, { encoding: 'utf8', stdio: ['ignore','pipe','ignore'] }).trim().split('\n');
-      for (const n of all) {
-        if (n.startsWith(`${VIEW_PREFIX}${name}__`)) {
-          try { execSync(`${TMUX} kill-session -t ${JSON.stringify(n)}`, { stdio: 'ignore' }); } catch (_) {}
-        }
-      }
-    } catch (_) {}
     execSync(`${TMUX} kill-session -t ${JSON.stringify(name)}`, { stdio: 'ignore' });
     const st = sessions.get(name);
     if (st) {
@@ -342,6 +331,18 @@ app.post('/api/sessions/:name/windows/:idx/kill', (req, res) => {
   }
 });
 
+app.post('/api/sessions/:name/windows/:idx/select', (req, res) => {
+  const name = req.params.name;
+  const idx = parseInt(req.params.idx, 10);
+  if (!isValidName(name) || isNaN(idx)) return res.status(400).json({ ok: false, error: 'invalid params' });
+  try {
+    execSync(`${TMUX} select-window -t ${JSON.stringify(name + ':' + idx)}`, { stdio: 'ignore' });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.stderr ? e.stderr.toString() : String(e) });
+  }
+});
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
@@ -352,21 +353,8 @@ wss.on('connection', (ws, req) => {
 
   const cols = parseInt(url.searchParams.get('cols') || '120', 10);
   const rows = parseInt(url.searchParams.get('rows') || '40', 10);
-  const windowParam = url.searchParams.get('window');
-  const windowIdx = windowParam != null ? parseInt(windowParam, 10) : null;
 
-  // Pick the attach target:
-  //   - if window=IDX given: ensure a per-window linked view session
-  //     and attach to it pinned at SESSION:WINDOW so this pty cannot
-  //     accidentally share state with another panel.
-  //   - else attach directly to parent (legacy / single-panel mode).
-  let attachTarget = name;
-  if (windowIdx != null && !isNaN(windowIdx)) {
-    const view = ensureViewSession(name, windowIdx);
-    attachTarget = `${view}:${windowIdx}`;
-  }
-
-  const term = pty.spawn(TMUX, ['attach', '-t', attachTarget], {
+  const term = pty.spawn(TMUX, ['attach', '-t', name], {
     name: 'xterm-256color',
     cols,
     rows,

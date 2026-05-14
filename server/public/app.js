@@ -15,14 +15,17 @@ const POLL_MS = 1000;
 const WINDOWS_POLL_MS = 1500;
 
 // state.current        : selected session name
-// state.panels         : Map<windowIdx, { container, term, fitAddon, ws }>
+// state.panel          : { container, term, fitAddon, ws } for the single xterm panel
+// state.windows        : last windows list
+// state.activeWindow   : active window index (matches tmux active)
 // state.sessionsById   : last-fetched session metadata
-// state.windowsKey     : "indices in current grid"   to detect changes
+// state.windowsTimer   : interval for windows polling
 let state = {
   current: null,
-  panels: new Map(),
+  panel: null,
+  windows: [],
+  activeWindow: null,
   sessionsById: new Map(),
-  windowsKey: '',
   windowsTimer: null,
 };
 
@@ -197,8 +200,9 @@ async function killSession(name) {
       currentEl.textContent = '세션을 선택하세요';
       killBtn.hidden = true;
       newWindowBtn.hidden = true;
-      closeAllPanels();
-      state.windowsKey = '';
+      closePanel();
+      state.windows = [];
+      state.activeWindow = null;
       showEmptyState();
     }
     await fetchSessions();
@@ -207,11 +211,14 @@ async function killSession(name) {
   }
 }
 
-function ensureGridView() {
-  if (mainContentEl.classList.contains('empty-state') || !mainContentEl.classList.contains('windows-grid')) {
-    mainContentEl.className = 'windows-grid';
-    mainContentEl.innerHTML = '';
-  }
+function ensureTerminalShell() {
+  if (mainContentEl.classList.contains('terminal-shell')) return;
+  mainContentEl.className = 'terminal-shell';
+  mainContentEl.innerHTML = `
+    <div class="window-tabs" id="windowTabs"></div>
+    <div class="terminal-card">
+      <div id="terminal"></div>
+    </div>`;
 }
 
 function showEmptyState() {
@@ -225,45 +232,18 @@ function showEmptyState() {
     </div>`;
 }
 
-function closeAllPanels() {
-  for (const [, p] of state.panels) closePanel(p);
-  state.panels.clear();
-}
-
-function closePanel(p) {
+function closePanel() {
+  const p = state.panel;
+  if (!p) return;
   if (p.ws) { try { p.ws.close(); } catch (_) {} }
   if (p.term) { try { p.term.dispose(); } catch (_) {} }
-  if (p.container && p.container.parentNode) p.container.parentNode.removeChild(p.container);
+  state.panel = null;
 }
 
-function createPanel(sessionName, w) {
-  const container = document.createElement('div');
-  container.className = 'window-panel';
-  container.dataset.window = String(w.index);
-
-  const header = document.createElement('div');
-  header.className = 'window-header';
-  const idx = document.createElement('div');
-  idx.className = 'window-idx';
-  idx.textContent = `#${w.index}`;
-  const title = document.createElement('div');
-  title.className = 'window-title';
-  title.textContent = w.name || `window-${w.index}`;
-  const kill = document.createElement('button');
-  kill.className = 'window-kill';
-  kill.type = 'button';
-  kill.textContent = '×';
-  kill.title = '윈도우 종료';
-  kill.addEventListener('click', () => killWindow(sessionName, w.index));
-  header.appendChild(idx);
-  header.appendChild(title);
-  header.appendChild(kill);
-  container.appendChild(header);
-
-  const termEl = document.createElement('div');
-  termEl.className = 'window-terminal';
-  container.appendChild(termEl);
-
+function openPanel(sessionName) {
+  closePanel();
+  ensureTerminalShell();
+  const termEl = document.getElementById('terminal');
   const term = new Terminal({
     fontFamily: 'JetBrains Mono, ui-monospace, monospace',
     fontSize: 13,
@@ -278,13 +258,11 @@ function createPanel(sessionName, w) {
   });
   const fitAddon = new FitAddon.FitAddon();
   term.loadAddon(fitAddon);
-
-  mainContentEl.appendChild(container);
   term.open(termEl);
   fitAddon.fit();
 
   const { cols, rows } = term;
-  const wsUrl = `ws://${location.host}/ws?session=${encodeURIComponent(sessionName)}&window=${w.index}&cols=${cols}&rows=${rows}`;
+  const wsUrl = `ws://${location.host}/ws?session=${encodeURIComponent(sessionName)}&cols=${cols}&rows=${rows}`;
   const ws = new WebSocket(wsUrl);
   ws.binaryType = 'arraybuffer';
   ws.onmessage = (ev) => {
@@ -294,7 +272,63 @@ function createPanel(sessionName, w) {
   ws.onclose = () => term.writeln('\r\n\x1b[2m[sgtmux] disconnected.\x1b[0m');
   term.onData((d) => { if (ws.readyState === 1) ws.send(d); });
 
-  return { container, term, fitAddon, ws, windowIndex: w.index };
+  state.panel = { term, fitAddon, ws };
+}
+
+function renderWindowTabs() {
+  const tabsEl = document.getElementById('windowTabs');
+  if (!tabsEl) return;
+
+  // diff against existing children for stability (avoid full re-create flicker)
+  const existing = new Map();
+  for (const el of Array.from(tabsEl.children)) {
+    if (el.dataset.idx != null) existing.set(parseInt(el.dataset.idx, 10), el);
+  }
+
+  for (const w of state.windows) {
+    let el = existing.get(w.index);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'window-tab';
+      el.dataset.idx = String(w.index);
+      const idx = document.createElement('span');
+      idx.className = 'window-tab-idx';
+      idx.textContent = `#${w.index}`;
+      const name = document.createElement('span');
+      name.className = 'window-tab-name';
+      name.textContent = w.name || `window-${w.index}`;
+      const kill = document.createElement('button');
+      kill.className = 'window-tab-kill';
+      kill.type = 'button';
+      kill.textContent = '×';
+      kill.title = '윈도우 종료';
+      kill.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        killWindow(state.current, w.index);
+      });
+      el.appendChild(idx);
+      el.appendChild(name);
+      el.appendChild(kill);
+      el.addEventListener('click', () => selectWindow(w.index));
+      tabsEl.appendChild(el);
+    } else {
+      existing.delete(w.index);
+      const nameEl = el.querySelector('.window-tab-name');
+      const wantName = w.name || `window-${w.index}`;
+      if (nameEl && nameEl.textContent !== wantName) nameEl.textContent = wantName;
+    }
+    el.classList.toggle('active', !!w.active);
+  }
+  // remove vanished
+  for (const el of existing.values()) el.remove();
+
+  // ensure order matches state.windows
+  for (let i = 0; i < state.windows.length; i++) {
+    const want = tabsEl.querySelector(`[data-idx="${state.windows[i].index}"]`);
+    if (want && tabsEl.children[i] !== want) {
+      tabsEl.insertBefore(want, tabsEl.children[i] || null);
+    }
+  }
 }
 
 async function refreshWindows() {
@@ -307,53 +341,37 @@ async function refreshWindows() {
   } catch (e) {
     return;
   }
+  state.windows = windows;
+  const active = windows.find(w => w.active);
+  state.activeWindow = active ? active.index : null;
+  renderWindowTabs();
 
-  const newKey = windows.map(w => `${w.index}:${w.name}`).join('|');
-  if (newKey === state.windowsKey) return;
-  state.windowsKey = newKey;
-
-  ensureGridView();
-
-  const present = new Set(windows.map(w => w.index));
-  // close panels for windows that disappeared
-  for (const [idx, p] of state.panels) {
-    if (!present.has(idx)) {
-      closePanel(p);
-      state.panels.delete(idx);
-    }
+  // if 0 windows (session has none — shouldn't happen with tmux), empty
+  if (windows.length === 0) {
+    closePanel();
+    showEmptyState();
   }
-  // open panels for new windows; update title for existing
-  for (const w of windows) {
-    if (!state.panels.has(w.index)) {
-      state.panels.set(w.index, createPanel(state.current, w));
-    } else {
-      const p = state.panels.get(w.index);
-      const titleEl = p.container.querySelector('.window-title');
-      if (titleEl && titleEl.textContent !== (w.name || `window-${w.index}`)) {
-        titleEl.textContent = w.name || `window-${w.index}`;
-      }
-    }
-  }
+}
 
-  // re-order panel DOM children to match window index order
-  const ordered = windows
-    .map(w => state.panels.get(w.index)?.container)
-    .filter(Boolean);
-  for (let i = 0; i < ordered.length; i++) {
-    if (mainContentEl.children[i] !== ordered[i]) {
-      mainContentEl.insertBefore(ordered[i], mainContentEl.children[i] || null);
-    }
+async function selectWindow(idx) {
+  if (!state.current) return;
+  if (state.activeWindow === idx) return;
+  try {
+    await fetch(`/api/sessions/${encodeURIComponent(state.current)}/windows/${idx}/select`, { method: 'POST' });
+    // optimistic: mark this idx active until next poll
+    state.activeWindow = idx;
+    state.windows = state.windows.map(w => ({ ...w, active: w.index === idx }));
+    renderWindowTabs();
+    refreshWindows();
+  } catch (e) {
+    alert('윈도우 전환 실패: ' + e.message);
   }
-
-  // if zero windows somehow → empty state
-  if (state.panels.size === 0) showEmptyState();
 }
 
 async function killWindow(sessionName, idx) {
   if (!confirm(`window #${idx}를 종료할까요?`)) return;
   try {
     await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/windows/${idx}/kill`, { method: 'POST' });
-    state.windowsKey = '';
     refreshWindows();
   } catch (e) {
     alert('윈도우 종료 실패: ' + e.message);
@@ -367,9 +385,9 @@ function selectSession(name) {
   killBtn.hidden = false;
   newWindowBtn.hidden = false;
 
-  closeAllPanels();
-  state.windowsKey = '';
-  ensureGridView();
+  openPanel(name);
+  state.windows = [];
+  renderWindowTabs();
   refreshWindows();
 
   // refresh sidebar styles
@@ -378,7 +396,6 @@ function selectSession(name) {
   });
 }
 
-// Auto-poll windows of the currently selected session.
 function startWindowsPolling() {
   if (state.windowsTimer) clearInterval(state.windowsTimer);
   state.windowsTimer = setInterval(() => {
@@ -387,15 +404,15 @@ function startWindowsPolling() {
 }
 
 window.addEventListener('resize', () => {
-  for (const [, p] of state.panels) {
-    try {
-      p.fitAddon.fit();
-      const { cols, rows } = p.term;
-      if (p.ws && p.ws.readyState === 1) {
-        p.ws.send(JSON.stringify({ resize: [cols, rows] }));
-      }
-    } catch (_) {}
-  }
+  const p = state.panel;
+  if (!p) return;
+  try {
+    p.fitAddon.fit();
+    const { cols, rows } = p.term;
+    if (p.ws && p.ws.readyState === 1) {
+      p.ws.send(JSON.stringify({ resize: [cols, rows] }));
+    }
+  } catch (_) {}
 });
 
 newBtn.addEventListener('click', async () => {
@@ -463,10 +480,9 @@ modalCreate.addEventListener('click', async () => {
     const j = await r.json();
     if (!j.ok) { alert('생성 실패: ' + (j.error || 'unknown')); return; }
     closeNewWindowModal();
-    state.windowsKey = '';
     await refreshWindows();
     // tmux may need a tick to register; refresh once more shortly after
-    setTimeout(() => { state.windowsKey = ''; refreshWindows(); }, 300);
+    setTimeout(refreshWindows, 300);
   } catch (e) {
     alert('요청 실패: ' + e.message);
   } finally {
