@@ -33,6 +33,10 @@ const PORT = parseInt(process.env.SGTMUX_PORT || '7681', 10);
 const TMUX = 'tmux';
 const VIEW_PREFIX = '_sgview_';
 const IDLE_THRESHOLD_MS = 1500;
+// A single isolated output event (tmux status-bar 15s tick, shell prompt
+// redraw, etc.) should NOT mark a session/window as "active". We require
+// sustained output: at least two output events whose gap is below this.
+const SUSTAINED_GAP_MS = 1500;
 // Burst detection: when a fresh tmux attach (monitor or WS client) happens,
 // tmux dumps a screen redraw. Output during that burst doesn't count as
 // "Claude is responding". Burst ends when 500ms of quiet passes OR 3s cap.
@@ -47,6 +51,7 @@ function trackSession(name) {
   if (!sessions.has(name)) {
     sessions.set(name, {
       lastOutputMs: 0,
+      prevOutputMs: 0,       // output before lastOutputMs (for sustained-output check)
       lastUserInputMs: 0,
       ptys: new Set(),       // WS-driven view ptys
       monitorPty: null,      // background read-only attach
@@ -107,6 +112,7 @@ function ensureMonitor(name) {
     }
     // Recent user input → this is shell echo of what they typed, not Claude
     if (now - state.lastUserInputMs < ECHO_SUPPRESS_MS) return;
+    state.prevOutputMs = state.lastOutputMs;
     state.lastOutputMs = now;
     if (data.includes('\x07')) state.bellAt = now;
   });
@@ -142,6 +148,7 @@ function trackWindow(session, idx) {
     windowStates.set(k, {
       hash: null,
       lastChangeMs: 0,
+      prevChangeMs: 0,         // for sustained-change detection
       prevStatus: 'unknown',
       completedAt: 0,
       acknowledgedAt: 0,
@@ -196,6 +203,7 @@ function pollWindowOnce(session, idx, isActiveWindow) {
     return;
   }
   if (state.hash !== null && state.hash !== h) {
+    state.prevChangeMs = state.lastChangeMs;
     state.lastChangeMs = now;
   }
   state.hash = h;
@@ -326,10 +334,18 @@ function tmuxList() {
     ensureMonitor(name);
     const state = sessions.get(name);
     const lastOutputMs = state ? state.lastOutputMs : 0;
+    const prevOutputMs = state ? state.prevOutputMs : 0;
     const idleMs = lastOutputMs ? now - lastOutputMs : null;
     let status = 'unknown';
     if (lastOutputMs > 0) {
-      status = idleMs > IDLE_THRESHOLD_MS ? 'idle' : 'active';
+      if (idleMs > IDLE_THRESHOLD_MS) {
+        status = 'idle';
+      } else if (lastOutputMs - prevOutputMs > SUSTAINED_GAP_MS) {
+        // Isolated burst (e.g. tmux status-bar 15s tick) — not real activity
+        status = 'idle';
+      } else {
+        status = 'active';
+      }
     }
     // Detect active → idle transition = "Claude just finished responding"
     if (state && state.prevStatus === 'active' && status === 'idle') {
@@ -358,7 +374,13 @@ function tmuxList() {
       const wIdleMs = ws.lastChangeMs ? now - ws.lastChangeMs : null;
       let wStatus = 'unknown';
       if (ws.lastChangeMs > 0) {
-        wStatus = wIdleMs > IDLE_THRESHOLD_MS ? 'idle' : 'active';
+        if (wIdleMs > IDLE_THRESHOLD_MS) {
+          wStatus = 'idle';
+        } else if (ws.lastChangeMs - ws.prevChangeMs > SUSTAINED_GAP_MS) {
+          wStatus = 'idle';
+        } else {
+          wStatus = 'active';
+        }
       }
       if (ws.prevStatus === 'active' && wStatus === 'idle') {
         ws.completedAt = now;
