@@ -223,6 +223,9 @@ wss.on('connection', (ws, req) => {
   // The background monitor pty is the source of truth for activity.
   // This WS pty only forwards bytes to the client.
   ensureMonitor(name);
+  // tmux emits a status-bar redraw to the existing monitor when a new
+  // client attaches. Suppress that as a burst.
+  startBurst(state);
 
   term.onData(data => {
     try { ws.send(data); } catch (_) {}
@@ -253,6 +256,9 @@ wss.on('connection', (ws, req) => {
   ws.on('close', () => {
     state.ptys.delete(term);
     try { term.kill(); } catch (_) {}
+    // tmux notifies remaining clients (our monitor) when this view detaches;
+    // treat that side-effect output as redraw, not activity.
+    startBurst(state);
   });
 });
 
