@@ -445,18 +445,6 @@ function openPanel(sessionName) {
     return true;
   });
 
-  // Shift+wheel: force xterm viewport scroll regardless of tmux mouse mode.
-  // Lets the user extend a Shift+drag selection beyond the visible area —
-  // start the drag with Shift, then Shift+wheel down/up to bring more text
-  // into view while the selection stays anchored.
-  termEl.addEventListener('wheel', (ev) => {
-    if (!ev.shiftKey) return;
-    const lines = Math.sign(ev.deltaY) * 3;
-    term.scrollLines(lines);
-    ev.preventDefault();
-    ev.stopPropagation();
-  }, { capture: true, passive: false });
-
   const { cols, rows } = term;
   const wsUrl = `ws://${location.host}/ws?session=${encodeURIComponent(sessionName)}&cols=${cols}&rows=${rows}`;
   const ws = new WebSocket(wsUrl);
