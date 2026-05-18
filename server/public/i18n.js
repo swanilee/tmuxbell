@@ -17,8 +17,6 @@ const I18N = {
     'topbar.new_window': '+ New window',
     'topbar.kill_session': 'Kill session',
     'topbar.toggle_sidebar': 'Collapse / expand sidebar',
-    'topbar.copy_mode': '📋 Copy',
-    'topbar.copy_mode_active': '📋 Copy mode — drag to select, Ctrl+C / Esc to finish',
 
     'empty.title': 'Pick a session on the left or create a new one',
     'empty.body': 'Run <code>tmuxbell</code> in a terminal to start a new tmux session.<br />A <strong>green</strong> dot means waiting for input; <strong>pink</strong> means working.',
@@ -68,8 +66,6 @@ const I18N = {
     'topbar.new_window': '+ 새 윈도우',
     'topbar.kill_session': '세션 종료',
     'topbar.toggle_sidebar': '사이드바 접기 / 펼치기',
-    'topbar.copy_mode': '📋 복사',
-    'topbar.copy_mode_active': '📋 복사 모드 — 드래그로 선택, Ctrl+C / Esc로 종료',
 
     'empty.title': '왼쪽에서 세션을 선택하거나 새로 만드세요',
     'empty.body': '터미널에서 <code>tmuxbell</code> 명령으로 새 tmux 세션을 시작할 수 있습니다.<br />세션 점이 <strong>녹색</strong>이면 응답 대기 중, <strong>분홍</strong>이면 작업 중입니다.',
@@ -119,8 +115,6 @@ const I18N = {
     'topbar.new_window': '+ 新建窗口',
     'topbar.kill_session': '关闭会话',
     'topbar.toggle_sidebar': '折叠 / 展开侧边栏',
-    'topbar.copy_mode': '📋 复制',
-    'topbar.copy_mode_active': '📋 复制模式 — 拖拽选择,Ctrl+C / Esc 完成',
 
     'empty.title': '从左侧选择一个会话或新建一个',
     'empty.body': '在终端运行 <code>tmuxbell</code> 即可启动一个新的 tmux 会话。<br /><strong>绿色</strong>圆点表示等待输入,<strong>粉色</strong>表示正在工作。',

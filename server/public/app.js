@@ -446,45 +446,16 @@ function openPanel(sessionName) {
   });
 
   // Shift+wheel: force xterm viewport scroll regardless of tmux mouse mode.
-  // Hooked at window level so it runs before any inner xterm/tmux capture.
-  const wheelHandler = (ev) => {
+  // Lets the user extend a Shift+drag selection beyond the visible area —
+  // start the drag with Shift, then Shift+wheel down/up to bring more text
+  // into view while the selection stays anchored.
+  termEl.addEventListener('wheel', (ev) => {
     if (!ev.shiftKey) return;
-    if (!termEl.contains(ev.target)) return;
-    term.scrollLines(Math.sign(ev.deltaY) * 3);
+    const lines = Math.sign(ev.deltaY) * 3;
+    term.scrollLines(lines);
     ev.preventDefault();
     ev.stopPropagation();
-  };
-  window.addEventListener('wheel', wheelHandler, { capture: true, passive: false });
-
-  // Auto-scroll when the user drag-selects past the viewport edge. xterm.js
-  // is supposed to do this on its own but the tmux mouse pipeline can
-  // interfere — so we provide a tiny safety implementation that fires only
-  // when xterm is actually doing the selection (Shift held, or mouse mode
-  // off entirely).
-  let dragActive = false;
-  let scrollTimer = null;
-  const stopScrollTimer = () => {
-    if (scrollTimer) { clearInterval(scrollTimer); scrollTimer = null; }
-  };
-  const mouseToggle = document.getElementById('mouseToggle');
-  termEl.addEventListener('mousedown', (ev) => {
-    // We're the one selecting if Shift is held, or if tmux mouse mode is off
-    dragActive = ev.shiftKey || !(mouseToggle && mouseToggle.checked);
-  });
-  document.addEventListener('mouseup', () => { dragActive = false; stopScrollTimer(); });
-  termEl.addEventListener('mousemove', (ev) => {
-    if (!dragActive) return;
-    const rect = termEl.getBoundingClientRect();
-    const edge = 30;
-    let dir = 0;
-    if (ev.clientY < rect.top + edge) dir = -1;
-    else if (ev.clientY > rect.bottom - edge) dir = 1;
-    if (dir !== 0 && !scrollTimer) {
-      scrollTimer = setInterval(() => term.scrollLines(dir), 60);
-    } else if (dir === 0) {
-      stopScrollTimer();
-    }
-  });
+  }, { capture: true, passive: false });
 
   const { cols, rows } = term;
   const wsUrl = `ws://${location.host}/ws?session=${encodeURIComponent(sessionName)}&cols=${cols}&rows=${rows}`;
@@ -758,78 +729,6 @@ modalCreate.addEventListener('click', async () => {
 });
 
 startWindowsPolling();
-
-// ── Copy mode: temporarily disable tmux mouse for clean selection ──
-// Click 📋 Copy → tmux mouse off + show banner → drag freely → Esc/Ctrl+C
-// completes and restores the previous mouse setting.
-const copyModeBtn = document.getElementById('copyModeBtn');
-let copyModePrevMouse = null;
-
-async function enterCopyMode() {
-  if (copyModePrevMouse !== null) return; // already in
-  try {
-    const r = await fetch('/api/mouse');
-    const j = await r.json();
-    copyModePrevMouse = !!j.enabled;
-  } catch (_) { copyModePrevMouse = false; }
-
-  if (copyModePrevMouse) {
-    try {
-      await fetch('/api/mouse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: false }),
-      });
-    } catch (_) {}
-  }
-
-  document.body.classList.add('copy-mode-active');
-  showCopyModeBanner(true);
-}
-
-async function exitCopyMode() {
-  if (copyModePrevMouse === null) return;
-  const wasOn = copyModePrevMouse;
-  copyModePrevMouse = null;
-  if (wasOn) {
-    try {
-      await fetch('/api/mouse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: true }),
-      });
-    } catch (_) {}
-  }
-  document.body.classList.remove('copy-mode-active');
-  showCopyModeBanner(false);
-}
-
-function showCopyModeBanner(show) {
-  let banner = document.getElementById('copyModeBanner');
-  if (show) {
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.id = 'copyModeBanner';
-      banner.className = 'copy-mode-banner';
-      document.body.appendChild(banner);
-    }
-    banner.textContent = tmuxbellI18n.t('topbar.copy_mode_active');
-  } else if (banner) {
-    banner.remove();
-  }
-}
-
-if (copyModeBtn) {
-  copyModeBtn.addEventListener('click', () => {
-    if (copyModePrevMouse !== null) exitCopyMode();
-    else enterCopyMode();
-  });
-}
-document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape' && copyModePrevMouse !== null) {
-    exitCopyMode();
-  }
-});
 
 // ── tmux global mouse mode toggle ───────────────────────────────────
 const mouseToggle = document.getElementById('mouseToggle');
