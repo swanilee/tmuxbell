@@ -445,6 +445,76 @@ function openPanel(sessionName) {
     return true;
   });
 
+  // Auto-scroll during selection drag near the viewport edge.
+  // xterm.js v5's built-in drag-scroll appears not to fire in this setup,
+  // so we re-implement it: detect a selection-mode drag, watch for the
+  // cursor lingering near the top/bottom edge, and tick term.scrollLines
+  // while dispatching a synthetic mousemove so xterm extends the
+  // selection in lockstep with the scroll.
+  let dragActive = false;
+  let dragShiftKey = false;
+  let lastClientX = 0;
+  let lastClientY = 0;
+  let edgeScrollTimer = null;
+  const stopEdgeScroll = () => {
+    if (edgeScrollTimer) { clearInterval(edgeScrollTimer); edgeScrollTimer = null; }
+  };
+  const mouseToggleEl = document.getElementById('mouseToggle');
+
+  termEl.addEventListener('mousedown', (ev) => {
+    if (ev.button !== 0) return;
+    const mouseModeOn = !!(mouseToggleEl && mouseToggleEl.checked);
+    // xterm is the one selecting if Shift held (mouse mode on bypass) or
+    // mouse mode is off entirely
+    if (ev.shiftKey || !mouseModeOn) {
+      dragActive = true;
+      dragShiftKey = ev.shiftKey;
+      lastClientX = ev.clientX;
+      lastClientY = ev.clientY;
+    }
+  }, true);
+
+  document.addEventListener('mousemove', (ev) => {
+    if (!dragActive) return;
+    lastClientX = ev.clientX;
+    lastClientY = ev.clientY;
+    dragShiftKey = ev.shiftKey;
+
+    const rect = termEl.getBoundingClientRect();
+    const edge = 25;
+    let dir = 0;
+    if (ev.clientY < rect.top + edge) dir = -1;
+    else if (ev.clientY > rect.bottom - edge) dir = 1;
+
+    if (dir !== 0) {
+      if (!edgeScrollTimer) {
+        edgeScrollTimer = setInterval(() => {
+          term.scrollLines(dir);
+          // Re-dispatch a mousemove at the cursor's current pixel
+          // position so xterm's SelectionService extends the selection
+          // to the new buffer row under the cursor.
+          const screen = termEl.querySelector('.xterm-screen') || termEl;
+          screen.dispatchEvent(new MouseEvent('mousemove', {
+            clientX: lastClientX,
+            clientY: lastClientY,
+            button: 0,
+            buttons: 1,
+            bubbles: true,
+            cancelable: true,
+            shiftKey: dragShiftKey,
+          }));
+        }, 50);
+      }
+    } else {
+      stopEdgeScroll();
+    }
+  }, true);
+
+  document.addEventListener('mouseup', () => {
+    dragActive = false;
+    stopEdgeScroll();
+  }, true);
+
   const { cols, rows } = term;
   const wsUrl = `ws://${location.host}/ws?session=${encodeURIComponent(sessionName)}&cols=${cols}&rows=${rows}`;
   const ws = new WebSocket(wsUrl);
