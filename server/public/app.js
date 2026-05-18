@@ -428,23 +428,6 @@ function openPanel(sessionName) {
   term.open(termEl);
   fitAddon.fit();
 
-  // Ctrl+C / Cmd+C: if text is selected → copy to clipboard and swallow the
-  // event (no ^C sent); otherwise let it pass through normally so SIGINT
-  // still works as expected.
-  term.attachCustomKeyEventHandler((ev) => {
-    if (ev.type !== 'keydown') return true;
-    const isCopy = (ev.ctrlKey || ev.metaKey) && !ev.altKey &&
-                   (ev.key === 'c' || ev.key === 'C');
-    if (isCopy && term.hasSelection()) {
-      const text = term.getSelection();
-      if (text && navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).catch(() => {});
-      }
-      return false;
-    }
-    return true;
-  });
-
   const { cols, rows } = term;
   const wsUrl = `ws://${location.host}/ws?session=${encodeURIComponent(sessionName)}&cols=${cols}&rows=${rows}`;
   const ws = new WebSocket(wsUrl);
