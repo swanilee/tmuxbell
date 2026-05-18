@@ -489,6 +489,28 @@ button {
 .topbar-actions {
   margin-left: auto;
 }
+
+/* ---------- Copy mode banner ---------- */
+.copy-mode-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent-magenta);
+  color: var(--canvas);
+  padding: 8px 18px;
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  z-index: 200;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+}
+body.copy-mode-active #copyModeBtn {
+  background: var(--accent-magenta);
+  color: var(--canvas);
+  border-radius: var(--r-pill);
+}
 .topbar-title {
   font-size: 18px;
   font-weight: 540;
